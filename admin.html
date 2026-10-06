@@ -28,7 +28,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px so
       <div class="field"><label>Código DANE (8 dígitos)</label><input id="shipCode" inputmode="numeric" placeholder="Ej. 11001000"></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Cédula del destinatario"></div>
+      <div class="field"><label id="shipCedulaLabel">Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Solo necesaria para oficina"></div>
       <div class="field"><label>Peso (kg)</label><input id="shipWeight" type="number" step="0.1" value="1"></div>
     </div>
     <p class="muted">Primero cotizaremos en 99 Envíos y usaremos automáticamente la cotización disponible más económica. Luego intentaremos crear el preenvío con esa transportadora.</p>
@@ -109,6 +109,7 @@ function openShipping(id){
   document.getElementById("shipCity").value=city;
   document.getElementById("shipCode").value=currentOrder.shipping_destination_code||DANE[city.trim().toLowerCase()]||"";
   document.getElementById("shipCedula").value=(currentOrder.address||"").match(/CÉDULA:\s*([0-9]+)/i)?.[1]||"";
+  updateCedulaField();
   document.getElementById("shippingMsg").textContent="";
   document.getElementById("shippingModal").classList.add("open");
  }).catch(e=>alert(e.message));
@@ -118,7 +119,7 @@ function closeShipping(){document.getElementById("shippingModal").classList.remo
 function cleanName(name){
  const parts=String(name||"Cliente").trim().split(/\s+/);return {nombre:parts.shift()||"Cliente",primerApellido:parts.shift()||"",segundoApellido:parts.join(" ")||""};
 }
-function dateDMY(){const d=new Date();return String(d.getDate())+"-"+String(d.getMonth()+1)+"-"+d.getFullYear()}
+function dateDMY(){const d=new Date();return d.getDate()+"-"+(d.getMonth()+1)+"-"+d.getFullYear()}
 function normalizeQuotes(raw){
  const root=raw?.data||raw;
  const carriers={"interrapidisimo":"interrapidisimo","coordinadora":"coordinadora","servientrega":"servientrega","envia":"envia"};
@@ -134,6 +135,16 @@ function normalizeQuotes(raw){
 }
 function quoteValue(q){
  return Number(q.valor_contrapago||q.valor||0)+Number(q.comision_interna||q.valor_interna||0)+Number(q.sobreflete||0)+Number(q.seguro99||0);
+}
+function isOfficeOrder(){
+ const dt=String(currentOrder?.delivery_type||currentOrder?.delivery||"").toLowerCase();
+ const addr=String(currentOrder?.address||"").toLowerCase();
+ return dt.includes("oficina")||addr.includes("oficina interrapidísimo")||addr.includes("oficina interrapidisimo");
+}
+function updateCedulaField(){
+ const office=isOfficeOrder();
+ document.getElementById("shipCedulaLabel").textContent=office?"Cédula del destinatario (obligatoria para oficina)":"Cédula del destinatario (opcional para domicilio)";
+ document.getElementById("shipCedula").placeholder=office?"Obligatoria para entrega en oficina":"Opcional para entrega a domicilio";
 }
 function parseAddress(raw){
  const s=String(raw||"");const parts=s.split(" · ");
@@ -164,7 +175,7 @@ async function generateShipping(){
     IdTipoEntrega:1,IdServicio:Number(chosen.IdServicio||chosen.idservicio||1),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
     Destinatario:{
-      tipoDocumento:"CC",numeroDocumento:cedula,nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
+      tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
       telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code,correo:currentCustomer.email||""
     },
     Observaciones:"Pedido PolosJ2",
