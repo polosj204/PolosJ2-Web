@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       if (!isDateValidation) throw firstError;
 
       const retryPayload = { ...safePayload };
-      const m = String(safePayload.fecha || "").match(/^(\\d{1,2})-(\\d{1,2})-(\\d{4})$/);
+      const m = String(safePayload.fecha || "").match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
       if (!m) throw firstError;
       retryPayload.fecha =
         String(m[1]).padStart(2, "0") + "-" +
