@@ -44,7 +44,10 @@ async function call99(path, body) {
     },
     body: JSON.stringify(body)
   });
-  const data = await r.json().catch(() => ({}));
+  const rawText = await r.text();
+  let data = {};
+  try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = {}; }
+  const responseHeaders = { contentType: r.headers.get("content-type") || "", location: r.headers.get("location") || "" };
   if (!r.ok) {
     if (r.status === 401) {
       cachedToken = null;
@@ -53,24 +56,18 @@ async function call99(path, body) {
     const err = new Error(data.message || data.error || JSON.stringify(data));
     err.status = r.status || 502;
     err.data = data;
+    err.raw = rawText;
+    err.responseStatus = r.status;
+    err.responseHeaders = responseHeaders;
     throw err;
   }
-  return data;
+  return { status: r.status, data, raw: rawText, headers: responseHeaders };
 }
 
 export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method === "GET") {
-    const test = String(req.query?.test || "");
-    if (test === "login") {
-      try {
-        await getToken();
-        return res.status(200).json({ ok: true, login_ok: true });
-      } catch (e) {
-        return res.status(e.status || 500).json({ ok: false, login_ok: false, error: e.message || "Error de login." });
-      }
-    }
     return res.status(200).json({ ok: true, configured: Boolean(process.env.NINETY_NINE_ENVIOS_EMAIL && process.env.NINETY_NINE_ENVIOS_PASSWORD) });
   }
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método no permitido." });
@@ -83,13 +80,16 @@ export default async function handler(req, res) {
     if (!payload || typeof payload !== "object") {
       return res.status(400).json({ ok: false, error: "Falta payload." });
     }
-    const data = await call99("/" + action, payload);
-    return res.status(200).json({ ok: true, data });
+    const result = await call99("/" + action, payload);
+    return res.status(200).json({ ok: true, data: result.data, upstream_status: result.status, upstream_raw: result.raw, upstream_headers: result.headers });
   } catch (e) {
     return res.status(e.status || 500).json({
       ok: false,
       error: e.message || "Error conectando con 99 Envíos.",
-      details: e.data || null
+      details: e.data || null,
+      upstream_status: e.responseStatus || null,
+      upstream_raw: e.raw || "",
+      upstream_headers: e.responseHeaders || null
     });
   }
 }
