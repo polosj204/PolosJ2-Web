@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     const action = String(req.query?.action || "");
     if (action === "oficinas") {
       const dane = String(req.query?.dane || "").trim();
-      if (!/^\\d{8}$/.test(dane)) return res.status(400).json({ ok:false, error:"DANE inválido." });
+      if (!/^\d{8}$/.test(dane)) return res.status(400).json({ ok:false, error:"DANE inválido." });
       try {
         const token = await getToken();
         const r = await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/" + encodeURIComponent(dane), {
