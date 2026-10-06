@@ -1,22 +1,196 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PolosJ2 Admin</title><style>body{font-family:Arial;background:#090909;color:#fff;padding:20px}.box{max-width:1000px;margin:auto;background:#151515;padding:20px;border-radius:16px;margin-bottom:16px}input,button{padding:12px;border-radius:10px;border:1px solid #444;background:#111;color:#fff}button{background:#fff;color:#000;font-weight:bold}table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #333;text-align:left}.ok{color:#5fda91}.muted{color:#999}.hide{display:none}</style></head><body><div class="box" id="login"><h2>PolosJ2 · Administración</h2><p class="muted">Acceso: polosj204@gmail.com</p><input id="pass" type="password" placeholder="Contraseña"><button onclick="login()">Entrar</button><p id="err"></p></div><div id="app" class="hide"><div class="box"><button onclick="load()">Actualizar</button> <button onclick="location.reload()">Cerrar sesión</button></div><div class="box"><h2>Pedidos</h2><div id="orders">Cargando...</div></div><div class="box"><h2>Códigos de segunda compra</h2><div id="codes">Cargando...</div></div></div><script>
-const U="https://wkvzclqemzzjlskmdeaw.supabase.co",K="sb_publishable_wRlaMcAjW9XYVupTbt3eZA_15W9XvVt";let T="";
-async function api(p,o={}){o.headers={...(o.headers||{}),apikey:K,Authorization:"Bearer "+T,"Content-Type":"application/json"};let r=await fetch(U+p,o),d=await r.json();if(!r.ok)throw Error(d.message||d.error_description||"Error");return d}
-async function login(){let r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:"polosj204@gmail.com",password:document.getElementById("pass").value})});let d=await r.json();if(!r.ok){document.getElementById("err").textContent=d.error_description||"Credenciales incorrectas";return}T=d.access_token;document.getElementById("login").classList.add("hide");document.getElementById("app").classList.remove("hide");load()}
-async function load(){try{let o=await api("/rest/v1/orders?select=*&order=created_at.desc"),c=await api("/rest/v1/customers?select=id,name,phone,city"),cm={};c.forEach(x=>cm[x.id]=x);document.getElementById("orders").innerHTML=o.length?'<table><tr><th>Cliente</th><th>Total</th><th>Estado</th><th></th></tr>'+o.map(x=>{let z=cm[x.customer_id]||{};return '<tr><td>'+z.name+'<br>'+z.phone+'</td><td>$'+Number(x.total).toLocaleString('es-CO')+'</td><td>'+x.status+'</td><td>'+(x.status==='delivered'?'<span class="ok">Entregado</span>':'<button onclick="deliver(\''+x.id+'\')">Marcar entregado</button>')+'</td></tr>'}).join('')+'</table>':'Sin pedidos';let d=await api("/rest/v1/discounts?select=code,discount_percent,active,used_at,expires_at,customer_id&order=created_at.desc");document.getElementById("codes").innerHTML=d.length?'<table><tr><th>Código</th><th>Descuento</th><th>Estado</th></tr>'+d.map(x=>'<tr><td><b>'+x.code+'</b></td><td>'+x.discount_percent+'%</td><td>'+(x.used_at?'Usado':'<span class="ok">Activo</span>')+'</td></tr>').join('')+'</table>':'Sin códigos'}catch(e){document.getElementById("orders").textContent=e.message}}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PolosJ2 Admin</title>
+<style>
+body{font-family:Arial;background:#090909;color:#fff;padding:20px}.box{max-width:1200px;margin:auto;background:#151515;padding:20px;border-radius:16px;margin-bottom:16px}
+input,button,select{padding:11px;border-radius:10px;border:1px solid #444;background:#111;color:#fff}button{background:#fff;color:#000;font-weight:bold;cursor:pointer}
+table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #333;text-align:left;vertical-align:top}.ok{color:#5fda91}.warn{color:#f2c86b}.bad{color:#ff8585}.muted{color:#999}.hide{display:none}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.small{padding:8px 10px;font-size:12px}.shipping{font-size:12px}.modal-bg{position:fixed;inset:0;background:#000b;display:none;place-items:center;z-index:50;padding:16px}.modal-bg.open{display:grid}.modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#171717;border:1px solid #444;border-radius:18px;padding:20px}.field{margin:10px 0}.field label{display:block;font-size:12px;color:#bbb;margin-bottom:5px}.field input,.field select{width:100%;box-sizing:border-box}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.msg{margin-top:10px;font-size:13px;white-space:pre-wrap}@media(max-width:700px){.grid{grid-template-columns:1fr}table{font-size:12px}}
+</style>
+</head>
+<body>
+<div class="box" id="login"><h2>PolosJ2 · Administración</h2><p class="muted">Acceso: polosj204@gmail.com</p><input id="pass" type="password" placeholder="Contraseña"><button onclick="login()">Entrar</button><p id="err" class="bad"></p></div>
+
+<div id="app" class="hide">
+  <div class="box"><button onclick="load()">Actualizar</button> <button onclick="location.reload()">Cerrar sesión</button></div>
+  <div class="box"><h2>Pedidos</h2><div id="orders">Cargando...</div></div>
+  <div class="box"><h2>Códigos de segunda compra</h2><div id="codes">Cargando...</div></div>
+</div>
+
+<div class="modal-bg" id="shippingModal">
+  <div class="modal">
+    <h2>Generar envío · 99 Envíos</h2>
+    <p id="shippingOrderInfo" class="muted"></p>
+    <div class="grid">
+      <div class="field"><label>Ciudad destino</label><input id="shipCity"></div>
+      <div class="field"><label>Código DANE (8 dígitos)</label><input id="shipCode" inputmode="numeric" placeholder="Ej. 11001000"></div>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Opcional si 99 la permite"></div>
+      <div class="field"><label>Peso (kg)</label><input id="shipWeight" type="number" step="0.1" value="1"></div>
+    </div>
+    <p class="muted">Primero cotizaremos en 99 Envíos y usaremos automáticamente la cotización disponible más económica. Luego intentaremos crear el preenvío con esa transportadora.</p>
+    <div class="actions"><button onclick="closeShipping()">Cancelar</button><button id="generateBtn" onclick="generateShipping()">Cotizar y generar guía</button></div>
+    <div id="shippingMsg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+const U="https://wkvzclqemzzjlskmdeaw.supabase.co",K="sb_publishable_wRlaMcAjW9XYVupTbt3eZA_15W9XvVt";
+const API99="/api/99envios";
+let T="", currentOrder=null, currentCustomer=null;
+const DANE={
+"bogota": "11001000","bogotá":"11001000","medellin":"05001000","medellín":"05001000","cali":"76001000",
+"barranquilla":"08001000","cartagena":"13001000","bucaramanga":"68001000","pereira":"66001000",
+"manizales":"17001000","armenia":"63001000","ibague":"73001000","ibagué":"73001000","villavicencio":"50001000",
+"santa marta":"47001000","cucuta":"54001000","cúcuta":"54001000","pasto":"52001000","neiva":"41001000",
+"valledupar":"20001000","monteria":"23001000","montería":"23001000","sincelejo":"70001000","popayan":"19001000",
+"popayán":"19001000","tunja":"15001000","yopal":"85001000","florencia":"18001000","riohacha":"44001000",
+"quibdo":"27001000","quibdó":"27001000","buenaventura":"76109000","palmira":"76520000","soacha":"25754000"
+};
+
+async function api(p,o={}){
+  o.headers={...(o.headers||{}),apikey:K,Authorization:"Bearer "+T,"Content-Type":"application/json"};
+  const r=await fetch(U+p,o); const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw Error(d.message||d.error_description||d.error||"Error");
+  return d;
+}
+async function login(){
+  const r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:"polosj204@gmail.com",password:document.getElementById("pass").value})});
+  const d=await r.json(); if(!r.ok){document.getElementById("err").textContent=d.error_description||"Credenciales incorrectas";return}
+  T=d.access_token;document.getElementById("login").classList.add("hide");document.getElementById("app").classList.remove("hide");load();
+}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+function money(v){return "$"+Number(v||0).toLocaleString("es-CO");}
+
+async function load(){
+ try{
+  const o=await api("/rest/v1/orders?select=*&order=created_at.desc");
+  const c=await api("/rest/v1/customers?select=id,name,phone,city"),cm={};c.forEach(x=>cm[x.id]=x);
+  document.getElementById("orders").innerHTML=o.length?'<table><tr><th>Cliente</th><th>Total</th><th>Estado</th><th>Envío</th><th>Acciones</th></tr>'+
+  o.map(x=>{
+    const z=cm[x.customer_id]||{}, ship=x.tracking_number?'<span class="ok">Guía: <b>'+esc(x.tracking_number)+'</b></span>':(x.shipping_error?'<span class="bad">Error: '+esc(x.shipping_error)+'</span>':'<span class="muted">Sin guía</span>');
+    const deliver=x.status==='delivered'?'<span class="ok">Entregado</span>':'<button class="small" onclick="deliver(\''+x.id+'\')">Marcar entregado</button>';
+    const gen=x.tracking_number?'<span class="ok">Generado</span>':'<button class="small" onclick="openShipping(\''+x.id+'\')">Generar envío</button>';
+    return '<tr><td><b>'+esc(z.name)+'</b><br>'+esc(z.phone)+'<br>'+esc(z.city)+'</td><td>'+money(x.total)+'</td><td>'+deliver+'</td><td class="shipping">'+ship+'</td><td><div class="actions">'+gen+'</div></td></tr>'
+  }).join("")+'</table>':'Sin pedidos';
+
+  const d=await api("/rest/v1/discounts?select=code,discount_percent,active,used_at,expires_at,customer_id&order=created_at.desc");
+  document.getElementById("codes").innerHTML=d.length?'<table><tr><th>Código</th><th>Descuento</th><th>Estado</th></tr>'+d.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+x.discount_percent+'%</td><td>'+(x.used_at?'Usado':'<span class="ok">Activo</span>')+'</td></tr>').join("")+'</table>':'Sin códigos';
+ }catch(e){document.getElementById("orders").textContent=e.message}
+}
+
 async function deliver(id){
-if(!confirm("¿Marcar como entregado? Se generará el código de segunda compra y prepararemos el WhatsApp del cliente."))return;
-try{
-const orders=await api("/rest/v1/orders?select=id,customer_id&id=eq."+id);
-if(!orders.length)throw Error("Pedido no encontrado");
-const customer=await api("/rest/v1/customers?select=name,phone&id=eq."+orders[0].customer_id);
-await api("/rest/v1/orders?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"delivered",delivered_at:new Date().toISOString()})});
-const codes=await api("/rest/v1/discounts?select=code,discount_percent,used_at,active&customer_id=eq."+orders[0].customer_id+"&order=created_at.desc&limit=1");
-load();
-if(codes.length && codes[0].code && customer.length && customer[0].phone){
-let phone=String(customer[0].phone).replace(/\\D/g,""); if(phone.startsWith("0")) phone=phone.slice(1); if(!phone.startsWith("57")) phone="57"+phone;
-const text=encodeURIComponent("Hola "+(customer[0].name||"")+" 👋\\n\\n¡Gracias por tu compra en PolosJ2! 🎉\\n\\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\\n\\n🎟️ *"+codes[0].code+"*\\n\\nEste código está asociado a tu número de WhatsApp y podrás usarlo en tu próxima compra en nuestra página web.\\n\\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴");
-window.open("https://wa.me/"+phone+"?text="+text,"_blank");
+ if(!confirm("¿Marcar como entregado? Se generará el código de segunda compra y prepararemos el WhatsApp del cliente."))return;
+ try{
+  const orders=await api("/rest/v1/orders?select=id,customer_id&id=eq."+id); if(!orders.length)throw Error("Pedido no encontrado");
+  const customer=await api("/rest/v1/customers?select=name,phone&id=eq."+orders[0].customer_id);
+  await api("/rest/v1/orders?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"delivered",delivered_at:new Date().toISOString()})});
+  const codes=await api("/rest/v1/discounts?select=code,discount_percent,used_at,active&customer_id=eq."+orders[0].customer_id+"&order=created_at.desc&limit=1");
+  load();
+  if(codes.length&&codes[0].code&&customer.length&&customer[0].phone){
+   let phone=String(customer[0].phone).replace(/\D/g,"");if(phone.startsWith("0"))phone=phone.slice(1);if(!phone.startsWith("57"))phone="57"+phone;
+   const text=encodeURIComponent("Hola "+(customer[0].name||"")+" 👋\n\n¡Gracias por tu compra en PolosJ2! 🎉\n\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\n\n🎟️ *"+codes[0].code+"*\n\nEste código está asociado a tu número de WhatsApp y podrás usarlo en tu próxima compra en nuestra página web.\n\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴");
+   window.open("https://wa.me/"+phone+"?text="+text,"_blank");
+  }
+ }catch(e){alert("El pedido se marcó, pero no pudimos preparar el mensaje: "+e.message)}
 }
-}catch(e){alert("El pedido se marcó, pero no pudimos preparar el mensaje: "+e.message)}
+
+function openShipping(id){
+ api("/rest/v1/orders?select=*&id=eq."+id).then(async rows=>{
+  if(!rows.length)throw Error("Pedido no encontrado");
+  currentOrder=rows[0];
+  const cs=await api("/rest/v1/customers?select=*&id=eq."+currentOrder.customer_id);
+  currentCustomer=cs[0]||{};
+  const city=currentCustomer.city||"";
+  document.getElementById("shippingOrderInfo").textContent=(currentCustomer.name||"Cliente")+" · "+money(currentOrder.total);
+  document.getElementById("shipCity").value=city;
+  document.getElementById("shipCode").value=currentOrder.shipping_destination_code||DANE[city.trim().toLowerCase()]||"";
+  document.getElementById("shipCedula").value=(currentOrder.address||"").match(/CÉDULA:\s*([0-9]+)/i)?.[1]||"";
+  document.getElementById("shippingMsg").textContent="";
+  document.getElementById("shippingModal").classList.add("open");
+ }).catch(e=>alert(e.message));
 }
-</script></body></html>
+function closeShipping(){document.getElementById("shippingModal").classList.remove("open");currentOrder=null;currentCustomer=null}
+
+function cleanName(name){
+ const parts=String(name||"Cliente").trim().split(/\s+/);return {nombre:parts.shift()||"Cliente",primerApellido:parts.shift()||"",segundoApellido:parts.join(" ")||""};
+}
+function dateDMY(){const d=new Date();return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear()}
+function normalizeQuotes(raw){
+ const root=raw?.data||raw;
+ const list=[];
+ const visit=(v,k)=>{
+  if(!v||typeof v!=="object")return;
+  if(Array.isArray(v)){v.forEach(x=>visit(x,k));return}
+  if(v.transportadora&&("valor" in v || "valorContraPago" in v || "valorInterna" in v || "valorInterno" in v)){
+    list.push({...v,_key:k||""});return;
+  }
+  Object.entries(v).forEach(([kk,vv])=>visit(vv,kk));
+ };
+ visit(root,"");
+ return list.filter(q=>q.exito!==false);
+}
+function quoteValue(q,contra){return Number(contra?(q.valorContraPago??q.valor??q.valorInterna??q.valorInterno):(q.valor??q.valorInterna??q.valorInterno??q.valorContraPago))||0}
+function parseAddress(raw){
+ const s=String(raw||"");const parts=s.split(" · ");
+ if(/^OFICINA INTERRAPIDÍSIMO/i.test(s))return {direccion:"OFICINA INTERRAPIDÍSIMO",barrio:"",office:true};
+ return {barrio:parts[0]||"",direccion:parts.slice(1).join(" · ")||s,office:false};
+}
+
+async function generateShipping(){
+ if(!currentOrder||!currentCustomer)return;
+ const btn=document.getElementById("generateBtn"),msg=document.getElementById("shippingMsg");
+ const city=document.getElementById("shipCity").value.trim(),code=document.getElementById("shipCode").value.trim(),cedula=document.getElementById("shipCedula").value.trim(),weight=Number(document.getElementById("shipWeight").value)||1;
+ if(!city||!/^\d{8}$/.test(code)){msg.className="msg bad";msg.textContent="Necesitamos la ciudad y el código DANE de 8 dígitos.";return}
+ btn.disabled=true;msg.className="msg";msg.textContent="Cotizando con 99 Envíos...";
+ const addr=parseAddress(currentOrder.address), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
+ const quotePayload={
+  destino:{nombre:city,codigo:code},
+  origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},
+  idTipoEntrega:1,idServicio:2,valorDeclarado:Number(currentOrder.total)||0,peso:weight,alto:10,largo:10,ancho:10,
+  fecha:dateDMY(),seguro99:false,seguro99plus:true,aplicaContrapago:contra
+ };
+ try{
+  const qr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cotizar",payload:quotePayload})});
+  const qj=await qr.json();if(!qr.ok||!qj.ok)throw Error(qj.error||"No se pudo cotizar.");
+  const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
+  const chosen=quotes.sort((a,b)=>quoteValue(a,contra)-quoteValue(b,contra))[0],shippingCost=quoteValue(chosen,contra);
+  msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.transportadora?.nombre||"transportadora")+". Generando preenvío...";
+  const prePayload={
+    destino:{nombre:city,codigo:code},
+    origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},
+    idTipoEntrega:1,idServicio:2,valorDeclarado:Number(currentOrder.total)||0,peso:weight,alto:10,largo:10,ancho:10,
+    fecha:dateDMY(),seguro99:false,seguro99plus:true,aplicaContrapago:contra,
+    descripcionContenido:"Combo(s) PolosJ2",
+    valorContenido:Number(currentOrder.total)||0,
+    destinatario:{
+      tipoDocumento:"CC",documento:cedula,nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
+      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,codigoPostal:"",ciudad:city,correo:currentCustomer.email||""
+    },
+    transportadora:chosen.transportadora,
+    origenCreacion:1
+  };
+  const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
+  const pj=await pr.json();if(!pr.ok||!pj.ok)throw Error(pj.error||"99 Envíos rechazó el preenvío.");
+  const raw=pj.data?.data||pj.data||{};
+  const tracking=raw.numeroGuia||raw.numeroPreenvio||raw.numero_preenvio||raw.guia||raw.tracking_number||"";
+  const external=raw.id||raw.idPreenvio||raw.id_preenvio||tracking;
+  if(!tracking&&!external)throw Error("99 Envíos respondió, pero no encontramos el número de guía/preenvío en la respuesta.");
+  await api("/rest/v1/orders?id=eq."+currentOrder.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+    shipping_provider:chosen.transportadora?.nombre||"99 Envíos",
+    shipping_service:"99 Envíos · "+(chosen.transportadora?.nombre||""),
+    shipping_status:"created",tracking_number:tracking||external,shipping_external_id:String(external),
+    shipping_cost:shippingCost,shipping_quote:qj.data,shipping_created_at:new Date().toISOString(),shipping_updated_at:new Date().toISOString(),shipping_destination_code:code,shipping_error:null
+  })});
+  msg.className="msg ok";msg.textContent="✅ Envío creado. Guía/preenvío: "+(tracking||external)+" · "+(chosen.transportadora?.nombre||"99 Envíos");
+  load();
+ }catch(e){
+  msg.className="msg bad";msg.textContent="❌ "+e.message;
+  try{await api("/rest/v1/orders?id=eq."+currentOrder.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({shipping_status:"error",shipping_error:e.message,shipping_updated_at:new Date().toISOString(),shipping_destination_code:code})})}catch(_){}
+ }finally{btn.disabled=false}
+}
+</script>
+</body></html>
