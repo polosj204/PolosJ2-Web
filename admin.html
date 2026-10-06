@@ -159,6 +159,7 @@ async function generateShipping(){
  if(!city||!/^\d{8}$/.test(code)){msg.className="msg bad";msg.textContent="Necesitamos la ciudad y el código DANE de 8 dígitos.";return}
  btn.disabled=true;msg.className="msg";msg.textContent="Cotizando con 99 Envíos...";
  const addr=parseAddress(currentOrder.address), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
+ if(!addr.direccion && !addr.office){msg.className="msg bad";msg.textContent="El pedido no tiene una dirección de entrega registrada. Revisa la dirección del pedido antes de generar el envío.";btn.disabled=false;return}
  const quotePayload={
   destino:{nombre:city,codigo:code},
   origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},
@@ -172,7 +173,7 @@ async function generateShipping(){
   const chosen=quotes.sort((a,b)=>quoteValue(a)-quoteValue(b))[0],shippingCost=quoteValue(chosen);
   msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
-    IdTipoEntrega:1,IdServicio:Number(chosen.IdServicio||chosen.idservicio||1),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+    IdTipoEntrega:1,IdServicio:1,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
     Destinatario:{
       tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
