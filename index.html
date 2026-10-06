@@ -113,8 +113,8 @@ src="https://www.facebook.com/tr?id=4585248965093888&ev=PageView&noscript=1"/></
 <div class="team-modal" id="teamModal" onclick="closeTeamModal(event)"><div class="team-modal-box" onclick="event.stopPropagation()"><div class="team-modal-head"><div><div class="eyebrow" id="teamModalEyebrow">Elige tu color</div><h3 id="teamModalTitle">Colores disponibles</h3><p>Selecciona el color que quieres ver y comprar.</p></div><button class="close" onclick="closeTeamModal()">×</button></div><div class="color-grid" id="colorGrid"></div><div class="modal-tip">Después de elegir el color, selecciona tu talla y agrega el combo al carrito.</div></div></div>
 <div class="overlay" id="overlay" onclick="closeCart()"></div>
 <aside class="drawer" id="drawer" aria-label="Mi pedido"><div class="drawer-head"><h3>🛒 Mi pedido</h3><button class="close" onclick="closeCart()">×</button></div><div class="drawer-body" id="cartBody"></div><div class="drawer-foot"><div class="total"><span>Total estimado</span><span id="cartTotal">$0 <small>COP</small></span></div><button class="btn primary full" id="checkoutBtn" onclick="openCheckout()">Continuar con mis datos</button></div></aside>
-<div class="modal-wrap" id="checkoutModal"><div class="modal"><div class="modal-head"><h3>Finalizar pedido</h3><button class="close" onclick="closeCheckout()">×</button></div><div class="form" id="checkoutFormWrap"><div class="grid2"><div class="field"><label>Nombre completo *</label><input id="name" autocomplete="name" placeholder="Tu nombre"></div><div class="field"><label>Teléfono / WhatsApp *</label><input id="phone" inputmode="tel" autocomplete="tel" placeholder="300 000 0000"></div></div><div class="field"><label>Ciudad / municipio *</label><input id="city" autocomplete="address-level2" placeholder="Ej. Villanueva" onblur="checkCity()" onkeydown="if(event.key==='Enter'){event.preventDefault();checkCity()}"><div id="cityHelp" class="note">Escribe el municipio y selecciona el departamento. Esto permite identificar correctamente el destino.</div></div>
-<div class="field" id="departmentField"><label>Departamento *</label><select id="department" onchange="selectDepartment()">
+<div class="modal-wrap" id="checkoutModal"><div class="modal"><div class="modal-head"><h3>Finalizar pedido</h3><button class="close" onclick="closeCheckout()">×</button></div><div class="form" id="checkoutFormWrap"><div class="grid2"><div class="field"><label>Nombre completo *</label><input id="name" autocomplete="name" placeholder="Tu nombre"></div><div class="field"><label>Teléfono / WhatsApp *</label><input id="phone" inputmode="tel" autocomplete="tel" placeholder="300 000 0000"></div></div><div class="field"><label>Ciudad / municipio *</label><input id="city" autocomplete="address-level2" placeholder="Ej. Villanueva" oninput="cityChanged()" onblur="checkCity()" onkeydown="if(event.key==='Enter'){event.preventDefault();checkCity()}"><div id="cityHelp" class="note">Escribe el municipio y selecciona el departamento. Esto permite identificar correctamente el destino.</div></div>
+<div class="field" id="departmentField"><label>Departamento *</label><select id="department" autocomplete="off" onchange="selectDepartment()">
 <option value="">Selecciona el departamento</option>
 <option>Amazonas</option><option>Antioquia</option><option>Arauca</option><option>Atlántico</option><option>Bolívar</option><option>Boyacá</option><option>Caldas</option><option>Caquetá</option><option>Casanare</option><option>Cauca</option><option>Cesar</option><option>Chocó</option><option>Córdoba</option><option>Cundinamarca</option><option>Guainía</option><option>Guaviare</option><option>Huila</option><option>La Guajira</option><option>Magdalena</option><option>Meta</option><option>Nariño</option><option>Norte de Santander</option><option>Putumayo</option><option>Quindío</option><option>Risaralda</option><option>San Andrés, Providencia y Santa Catalina</option><option>Santander</option><option>Sucre</option><option>Tolima</option><option>Valle del Cauca</option><option>Vaupés</option><option>Vichada</option><option>Bogotá D.C.</option>
 </select><div id="departmentHelp" class="note">Selecciona el departamento donde está el municipio.</div></div>
@@ -189,6 +189,12 @@ async function checkCity(){
    help.textContent='No pudimos verificar el municipio. Revisa los datos e inténtalo nuevamente.';
   }
  },180);
+}
+function cityChanged(){
+ const select=document.getElementById('department');
+ cityMatches=[];
+ select.value='';
+ document.getElementById('cityHelp').textContent='Selecciona el departamento donde está el municipio.';
 }
 function selectDepartment(){
  const dep=val('department');
