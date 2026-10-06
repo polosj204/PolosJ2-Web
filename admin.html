@@ -119,7 +119,7 @@ function closeShipping(){document.getElementById("shippingModal").classList.remo
 function cleanName(name){
  const parts=String(name||"Cliente").trim().split(/\s+/);return {nombre:parts.shift()||"Cliente",primerApellido:parts.shift()||"",segundoApellido:parts.join(" ")||""};
 }
-function dateDMY(){const d=new Date();return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear()}
+function dateDMY(){const d=new Date();return String(d.getDate())+"-"+String(d.getMonth()+1)+"-"+d.getFullYear()}
 function normalizeQuotes(raw){
  const root=raw?.data||raw;
  const carriers={"interrapidisimo":"interrapidisimo","coordinadora":"coordinadora","servientrega":"servientrega","envia":"envia"};
@@ -186,9 +186,15 @@ async function generateShipping(){
   const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
   const pj=await pr.json();if(!pr.ok||!pj.ok){const detail=pj.details?.errors?Object.entries(pj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((pj.error||"99 Envíos rechazó el preenvío.")+(detail?" · "+detail:""));}
   const raw=pj.data?.data||pj.data||{};
-  const tracking=raw.numeroPreenvio||raw.numeroGuia||"";
+  const tracking=raw.numeroPreenvio||raw.numeroGuia||raw.numeroGuiaTransportadora||raw.guia||raw.numeroGuiaCliente||"";
   const external=tracking;
-  if(!tracking&&!external)throw Error("99 Envíos respondió, pero no encontramos el número de guía/preenvío en la respuesta.");
+  if(!tracking&&!external){
+   const status=pj.upstream_status||"desconocido";
+   const body=String(pj.upstream_raw||"").trim();
+   const location=pj.upstream_headers?.location||"";
+   const diagnostic="99 Envíos respondió HTTP "+status+" pero no entregó un número de preenvío/guía."+(body?" Respuesta: "+body.slice(0,500):" El cuerpo de la respuesta llegó vacío.")+(location?" Location: "+location:"");
+   throw Error(diagnostic+" No volveremos a intentarlo automáticamente para evitar duplicados.");
+  }
   await api("/rest/v1/orders?id=eq."+currentOrder.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
     shipping_provider:chosen.carrierName||"99 Envíos",
     shipping_service:"99 Envíos · "+(chosen.carrierName||""),
