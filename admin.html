@@ -121,19 +121,20 @@ function cleanName(name){
 function dateDMY(){const d=new Date();return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear()}
 function normalizeQuotes(raw){
  const root=raw?.data||raw;
+ const carriers={"interrapidisimo":"interrapidisimo","coordinadora":"coordinadora","servientrega":"servientrega","envia":"envia"};
  const list=[];
- const visit=(v,k)=>{
-  if(!v||typeof v!=="object")return;
-  if(Array.isArray(v)){v.forEach(x=>visit(x,k));return}
-  if(v.transportadora&&("valor" in v || "valorContraPago" in v || "valorInterna" in v || "valorInterno" in v)){
-    list.push({...v,_key:k||""});return;
+ if(root&&typeof root==="object"){
+  for(const [key,value] of Object.entries(root)){
+   if(value&&typeof value==="object"&&value.exito!==false&&("valor" in value)){
+    list.push({...value,carrierKey:key,carrierName:carriers[key]||key});
+   }
   }
-  Object.entries(v).forEach(([kk,vv])=>visit(vv,kk));
- };
- visit(root,"");
- return list.filter(q=>q.exito!==false);
+ }
+ return list;
 }
-function quoteValue(q,contra){return Number(contra?(q.valorContraPago??q.valor??q.valorInterna??q.valorInterno):(q.valor??q.valorInterna??q.valorInterno??q.valorContraPago))||0}
+function quoteValue(q){
+ return Number(q.valor||0)+Number(q.valor_contrapago||0)+Number(q.comision_interna||q.valor_interna||0)+Number(q.sobreflete||0)+Number(q.seguro99||0);
+}
 function parseAddress(raw){
  const s=String(raw||"");const parts=s.split(" · ");
  if(/^OFICINA INTERRAPIDÍSIMO/i.test(s))return {direccion:"OFICINA INTERRAPIDÍSIMO",barrio:"",office:true};
@@ -157,31 +158,28 @@ async function generateShipping(){
   const qr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cotizar",payload:quotePayload})});
   const qj=await qr.json();if(!qr.ok||!qj.ok)throw Error(qj.error||"No se pudo cotizar.");
   const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
-  const chosen=quotes.sort((a,b)=>quoteValue(a,contra)-quoteValue(b,contra))[0],shippingCost=quoteValue(chosen,contra);
+  const chosen=quotes.sort((a,b)=>quoteValue(b)-quoteValue(a))[0],shippingCost=quoteValue(chosen);
   msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.transportadora?.nombre||"transportadora")+". Generando preenvío...";
   const prePayload={
-    destino:{nombre:city,codigo:code},
-    origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},
-    idTipoEntrega:1,idServicio:2,valorDeclarado:Number(currentOrder.total)||0,peso:weight,alto:10,largo:10,ancho:10,
-    fecha:dateDMY(),seguro99:false,seguro99plus:true,aplicaContrapago:contra,
-    descripcionContenido:"Combo(s) PolosJ2",
-    valorContenido:Number(currentOrder.total)||0,
-    destinatario:{
-      tipoDocumento:"CC",documento:cedula,nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
-      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,codigoPostal:"",ciudad:city,correo:currentCustomer.email||""
+    idTipoEntrega:1,idServicio:Number(chosen.idservicio||1),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+    diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
+    Destinatario:{
+      tipoDocumento:"CC",numeroDocumento:cedula||"0000000000",nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
+      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code.slice(0,5),correo:currentCustomer.email||""
     },
-    transportadora:chosen.transportadora,
+    observaciones:"Pedido PolosJ2",
+    transportadora:{pais:"colombia",nombre:chosen.carrierName},
     origenCreacion:1
   };
   const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
   const pj=await pr.json();if(!pr.ok||!pj.ok)throw Error(pj.error||"99 Envíos rechazó el preenvío.");
   const raw=pj.data?.data||pj.data||{};
-  const tracking=raw.numeroGuia||raw.numeroPreenvio||raw.numero_preenvio||raw.guia||raw.tracking_number||"";
-  const external=raw.id||raw.idPreenvio||raw.id_preenvio||tracking;
+  const tracking=raw.numeroPreenvio||raw.numeroGuia||"";
+  const external=tracking;
   if(!tracking&&!external)throw Error("99 Envíos respondió, pero no encontramos el número de guía/preenvío en la respuesta.");
   await api("/rest/v1/orders?id=eq."+currentOrder.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
-    shipping_provider:chosen.transportadora?.nombre||"99 Envíos",
-    shipping_service:"99 Envíos · "+(chosen.transportadora?.nombre||""),
+    shipping_provider:chosen.carrierName||"99 Envíos",
+    shipping_service:"99 Envíos · "+(chosen.carrierName||""),
     shipping_status:"created",tracking_number:tracking||external,shipping_external_id:String(external),
     shipping_cost:shippingCost,shipping_quote:qj.data,shipping_created_at:new Date().toISOString(),shipping_updated_at:new Date().toISOString(),shipping_destination_code:code,shipping_error:null
   })});
