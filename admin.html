@@ -3,5 +3,20 @@ const U="https://wkvzclqemzzjlskmdeaw.supabase.co",K="sb_publishable_wRlaMcAjW9X
 async function api(p,o={}){o.headers={...(o.headers||{}),apikey:K,Authorization:"Bearer "+T,"Content-Type":"application/json"};let r=await fetch(U+p,o),d=await r.json();if(!r.ok)throw Error(d.message||d.error_description||"Error");return d}
 async function login(){let r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:"polosj204@gmail.com",password:document.getElementById("pass").value})});let d=await r.json();if(!r.ok){document.getElementById("err").textContent=d.error_description||"Credenciales incorrectas";return}T=d.access_token;document.getElementById("login").classList.add("hide");document.getElementById("app").classList.remove("hide");load()}
 async function load(){try{let o=await api("/rest/v1/orders?select=*&order=created_at.desc"),c=await api("/rest/v1/customers?select=id,name,phone,city"),cm={};c.forEach(x=>cm[x.id]=x);document.getElementById("orders").innerHTML=o.length?'<table><tr><th>Cliente</th><th>Total</th><th>Estado</th><th></th></tr>'+o.map(x=>{let z=cm[x.customer_id]||{};return '<tr><td>'+z.name+'<br>'+z.phone+'</td><td>$'+Number(x.total).toLocaleString('es-CO')+'</td><td>'+x.status+'</td><td>'+(x.status==='delivered'?'<span class="ok">Entregado</span>':'<button onclick="deliver(\''+x.id+'\')">Marcar entregado</button>')+'</td></tr>'}).join('')+'</table>':'Sin pedidos';let d=await api("/rest/v1/discounts?select=code,discount_percent,active,used_at,expires_at,customer_id&order=created_at.desc");document.getElementById("codes").innerHTML=d.length?'<table><tr><th>Código</th><th>Descuento</th><th>Estado</th></tr>'+d.map(x=>'<tr><td><b>'+x.code+'</b></td><td>'+x.discount_percent+'%</td><td>'+(x.used_at?'Usado':'<span class="ok">Activo</span>')+'</td></tr>').join('')+'</table>':'Sin códigos'}catch(e){document.getElementById("orders").textContent=e.message}}
-async function deliver(id){if(!confirm("¿Marcar como entregado? Se generará el código de segunda compra si corresponde."))return;await api("/rest/v1/orders?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"delivered",delivered_at:new Date().toISOString()})});load()}
+async function deliver(id){
+if(!confirm("¿Marcar como entregado? Se generará el código de segunda compra y prepararemos el WhatsApp del cliente."))return;
+try{
+const orders=await api("/rest/v1/orders?select=id,customer_id&id=eq."+id);
+if(!orders.length)throw Error("Pedido no encontrado");
+const customer=await api("/rest/v1/customers?select=name,phone&id=eq."+orders[0].customer_id);
+await api("/rest/v1/orders?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"delivered",delivered_at:new Date().toISOString()})});
+const codes=await api("/rest/v1/discounts?select=code,discount_percent,used_at,active&customer_id=eq."+orders[0].customer_id+"&order=created_at.desc&limit=1");
+load();
+if(codes.length && codes[0].code && customer.length && customer[0].phone){
+let phone=String(customer[0].phone).replace(/\\D/g,""); if(phone.startsWith("0")) phone=phone.slice(1); if(!phone.startsWith("57")) phone="57"+phone;
+const text=encodeURIComponent("Hola "+(customer[0].name||"")+" 👋\\n\\n¡Gracias por tu compra en PolosJ2! 🎉\\n\\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\\n\\n🎟️ *"+codes[0].code+"*\\n\\nEste código está asociado a tu número de WhatsApp y podrás usarlo en tu próxima compra en nuestra página web.\\n\\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴");
+window.open("https://wa.me/"+phone+"?text="+text,"_blank");
+}
+}catch(e){alert("El pedido se marcó, pero no pudimos preparar el mensaje: "+e.message)}
+}
 </script></body></html>
