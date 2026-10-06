@@ -88,6 +88,31 @@ export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method === "GET") {
+    const action = String(req.query?.action || "");
+    if (action === "oficinas") {
+      const dane = String(req.query?.dane || "").trim();
+      if (!/^\\d{8}$/.test(dane)) return res.status(400).json({ ok:false, error:"DANE inválido." });
+      try {
+        const token = await getToken();
+        const r = await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/" + encodeURIComponent(dane), {
+          method:"GET",
+          headers:{ Authorization:"Bearer " + token, Accept:"application/json" }
+        });
+        const raw = await r.text();
+        let data=[]; try { data = raw ? JSON.parse(raw) : []; } catch (_) {}
+        if (!r.ok) {
+          if (r.status === 401) { cachedToken=null; cachedAt=0; }
+          return res.status(r.status || 502).json({ok:false,error:"99 Envíos no pudo consultar las oficinas.",details:data,upstream_status:r.status});
+        }
+        const offices = Array.isArray(data) ? data.map(x => {
+          const c=x?.CentroServicio || {};
+          return { id:String(c.IdCentroServicio || ""), address:String(c.Direccion || ""), city:String(c.Ciudad || ""), department:String(c.Departamento || "") };
+        }).filter(x=>x.id && x.address) : [];
+        return res.status(200).json({ok:true,offices});
+      } catch(e) {
+        return res.status(e.status || 502).json({ok:false,error:e.message || "Error consultando oficinas 99 Envíos."});
+      }
+    }
     return res.status(200).json({ ok: true, configured: Boolean(process.env.NINETY_NINE_ENVIOS_EMAIL && process.env.NINETY_NINE_ENVIOS_PASSWORD) });
   }
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método no permitido." });
