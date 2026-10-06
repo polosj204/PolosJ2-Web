@@ -143,8 +143,8 @@ function isOfficeOrder(){
 }
 function updateCedulaField(){
  const office=isOfficeOrder();
- document.getElementById("shipCedulaLabel").textContent=office?"Cédula del destinatario (obligatoria para oficina)":"Cédula del destinatario (opcional para domicilio)";
- document.getElementById("shipCedula").placeholder=office?"Obligatoria para entrega en oficina":"Opcional para entrega a domicilio";
+ document.getElementById("shipCedulaLabel").textContent=office?"Cédula del destinatario (obligatoria para oficina)":"Cédula del destinatario (requerida por 99 Envíos)";
+ document.getElementById("shipCedula").placeholder=office?"Obligatoria para entrega en oficina":"Requerida para generar el envío";
 }
 function parseAddress(raw){
  const s=String(raw||"");const parts=s.split(" · ");
