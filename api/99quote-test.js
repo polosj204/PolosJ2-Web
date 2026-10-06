@@ -3,10 +3,10 @@ export default async function handler(req, res) {
   try {
     const base = "https://polosj2-web.vercel.app/api/99envios";
     const now = new Date();
-    const parts = new Intl.DateTimeFormat("es-CO", {
+    const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Bogota",
-      day: "numeric",
-      month: "numeric",
+      day: "2-digit",
+      month: "2-digit",
       year: "numeric"
     }).formatToParts(now);
     const get = (type) => parts.find((p) => p.type === type)?.value || "";
