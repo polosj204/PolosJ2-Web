@@ -28,7 +28,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px so
       <div class="field"><label>Código DANE (8 dígitos)</label><input id="shipCode" inputmode="numeric" placeholder="Ej. 11001000"></div>
     </div>
     <div class="grid">
-      <div class="field"><label>Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Opcional si 99 la permite"></div>
+      <div class="field"><label>Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Cédula del destinatario"></div>
       <div class="field"><label>Peso (kg)</label><input id="shipWeight" type="number" step="0.1" value="1"></div>
     </div>
     <p class="muted">Primero cotizaremos en 99 Envíos y usaremos automáticamente la cotización disponible más económica. Luego intentaremos crear el preenvío con esa transportadora.</p>
@@ -156,7 +156,7 @@ async function generateShipping(){
  };
  try{
   const qr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cotizar",payload:quotePayload})});
-  const qj=await qr.json();if(!qr.ok||!qj.ok)throw Error(qj.error||"No se pudo cotizar.");
+  const qj=await qr.json();if(!qr.ok||!qj.ok){const detail=qj.details?.errors?Object.entries(qj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((qj.error||"No se pudo cotizar.")+(detail?" · "+detail:""));}
   const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
   const chosen=quotes.sort((a,b)=>quoteValue(a)-quoteValue(b))[0],shippingCost=quoteValue(chosen);
   msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
@@ -164,7 +164,7 @@ async function generateShipping(){
     IdTipoEntrega:1,IdServicio:Number(chosen.IdServicio||chosen.idservicio||1),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
     Destinatario:{
-      tipoDocumento:"CC",numeroDocumento:cedula||"0000000000",nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
+      tipoDocumento:"CC",numeroDocumento:cedula,nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
       telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code,correo:currentCustomer.email||""
     },
     Observaciones:"Pedido PolosJ2",
@@ -172,7 +172,7 @@ async function generateShipping(){
     origenCreacion:1
   };
   const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
-  const pj=await pr.json();if(!pr.ok||!pj.ok)throw Error(pj.error||"99 Envíos rechazó el preenvío.");
+  const pj=await pr.json();if(!pr.ok||!pj.ok){const detail=pj.details?.errors?Object.entries(pj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((pj.error||"99 Envíos rechazó el preenvío.")+(detail?" · "+detail:""));}
   const raw=pj.data?.data||pj.data||{};
   const tracking=raw.numeroPreenvio||raw.numeroGuia||"";
   const external=tracking;
