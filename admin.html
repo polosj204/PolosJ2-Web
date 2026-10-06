@@ -284,7 +284,7 @@ function parseAddress(raw){
 async function generateShipping(){
  if(!currentOrder||!currentCustomer)return;
  const btn=document.getElementById("generateBtn"),msg=document.getElementById("shippingMsg");
- const city=document.getElementById("shipCity").value.trim(),code=document.getElementById("shipCode").value.trim(),cedula=document.getElementById("shipCedula").value.trim(),weight=Number(document.getElementById("shipWeight").value)||1;
+ const city=document.getElementById("shipCity").value.trim(); let code=document.getElementById("shipCode").value.trim(); const cedula=document.getElementById("shipCedula").value.trim(),weight=Number(document.getElementById("shipWeight").value)||1;
  if(!city||!/^\d{8}$/.test(code)){msg.className="msg bad";msg.textContent="Necesitamos la ciudad y el código DANE de 8 dígitos.";return}
  btn.disabled=true;msg.className="msg";msg.textContent="Cotizando con 99 Envíos...";
  const addr=parseAddress(currentCustomer.address||currentOrder.address), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
