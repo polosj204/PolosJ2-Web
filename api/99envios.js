@@ -102,7 +102,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Falta payload." });
     }
     safePayload = normalizePayload(action, payload);
-    const result = await call99("/" + action, safePayload);
+    let result;
+    try {
+      result = await call99("/" + action, safePayload);
+    } catch (firstError) {
+      // 99 Envíos has returned inconsistent validation around fecha. For
+      // cotización only (no shipment creation), retry once with the padded
+      // equivalent if the first request is specifically rejected on fecha.
+      const isDateValidation =
+        action === "cotizar" &&
+        firstError?.status === 422 &&
+        /fecha/i.test(firstError?.raw || "") &&
+        /format/i.test(firstError?.raw || "");
+      if (!isDateValidation) throw firstError;
+
+      const retryPayload = { ...safePayload };
+      const m = String(safePayload.fecha || "").match(/^(\\d{1,2})-(\\d{1,2})-(\\d{4})$/);
+      if (!m) throw firstError;
+      retryPayload.fecha =
+        String(m[1]).padStart(2, "0") + "-" +
+        String(m[2]).padStart(2, "0") + "-" +
+        m[3];
+      safePayload = retryPayload;
+      result = await call99("/" + action, retryPayload);
+    }
     return res.status(200).json({ ok: true, data: result.data, upstream_status: result.status, upstream_raw: result.raw, upstream_headers: result.headers });
   } catch (e) {
     return res.status(e.status || 500).json({
