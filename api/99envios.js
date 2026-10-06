@@ -36,18 +36,24 @@ async function getToken() {
 
 function normalizePayload(action, payload) {
   const p = { ...payload };
-  if (typeof p.fecha === "string") {
-    const raw = p.fecha.trim();
-    let m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-    if (m) p.fecha = String(Number(m[1])) + "-" + String(Number(m[2])) + "-" + m[3];
-    else {
-      m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-      if (m) p.fecha = String(Number(m[3])) + "-" + String(Number(m[2])) + "-" + m[1];
-    }
+
+  // 99 Envíos validates this field strictly as d-m-Y. Generate it
+  // server-side so browser formatting/caching cannot send dd-mm-yyyy.
+  // Use Colombia time because the shipment date is a local business date.
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  }).formatToParts(new Date());
+  const dateParts = {};
+  for (const part of parts) {
+    if (part.type !== "literal") dateParts[part.type] = part.value;
   }
+  p.fecha = String(Number(dateParts.day)) + "-" + String(Number(dateParts.month)) + "-" + dateParts.year;
+
   return p;
 }
-
 async function call99(path, body) {
   const token = await getToken();
   const r = await fetch(API_BASE + path, {
