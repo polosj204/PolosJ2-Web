@@ -146,6 +146,36 @@ function updateCedulaField(){
  document.getElementById("shipCedulaLabel").textContent=office?"Cédula del destinatario (obligatoria para oficina)":"Cédula del destinatario (requerida por 99 Envíos)";
  document.getElementById("shipCedula").placeholder=office?"Obligatoria para entrega en oficina":"Requerida para generar el envío";
 }
+function findTracking(value){
+  if(!value) return "";
+  if(typeof value==="string"||typeof value==="number"){
+    const s=String(value).trim();
+    if(/^(numeroPreenvio|numeroGuia|guia|tracking|preenvio)$/i.test(s)) return "";
+    return s;
+  }
+  if(Array.isArray(value)){
+    for(const item of value){const t=findTracking(item);if(t)return t;}
+    return "";
+  }
+  if(typeof value==="object"){
+    for(const key of ["numeroPreenvio","numeroGuia","numeroGuiaGenerada","numeroGuiaEnvio","guia","tracking","tracking_number","preenvio","numero"]){
+      if(value[key]!==undefined&&value[key]!==null&&String(value[key]).trim()) return String(value[key]).trim();
+    }
+    for(const [key,val] of Object.entries(value)){
+      if(/guia|tracking|preenvio/i.test(key)){const t=findTracking(val);if(t)return t;}
+    }
+    for(const val of Object.values(value)){const t=findTracking(val);if(t)return t;}
+  }
+  return "";
+}
+function upstreamDiagnostic(pj){
+  const parts=[];
+  if(pj?.upstream_status) parts.push("HTTP 99 Envíos: "+pj.upstream_status);
+  if(pj?.upstream_raw) parts.push("Respuesta: "+String(pj.upstream_raw).slice(0,1200));
+  const h=pj?.upstream_headers;
+  if(h?.location) parts.push("Location: "+h.location);
+  return parts.join(" · ");
+}
 function parseAddress(raw){
  const s=String(raw||"");const parts=s.split(" · ");
  if(/^OFICINA INTERRAPIDÍSIMO/i.test(s))return {direccion:"OFICINA INTERRAPIDÍSIMO",barrio:"",office:true};
