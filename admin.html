@@ -24,9 +24,10 @@ table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px so
     <h2>Generar envío · 99 Envíos</h2>
     <p id="shippingOrderInfo" class="muted"></p>
     <div class="grid">
-      <div class="field"><label>Ciudad destino</label><input id="shipCity"></div>
-      <div class="field"><label>Código DANE (8 dígitos)</label><input id="shipCode" inputmode="numeric" placeholder="Ej. 11001000"></div>
+      <div class="field"><label>Ciudad / municipio destino</label><input id="shipCity" readonly></div>
+      <div class="field"><label>Departamento</label><select id="shipDepartment" onchange="selectShipDepartment()"><option value="">Se identificará automáticamente</option></select></div>
     </div>
+    <div class="field"><label>Código DANE identificado automáticamente</label><input id="shipCode" inputmode="numeric" placeholder="Buscando código..." readonly></div>
     <div class="grid">
       <div class="field"><label id="shipCedulaLabel">Cédula del destinatario</label><input id="shipCedula" inputmode="numeric" placeholder="Solo necesaria para oficina"></div>
       <div class="field"><label>Peso (kg)</label><input id="shipWeight" type="number" step="0.1" value="1"></div>
@@ -98,6 +99,8 @@ async function deliver(id){
  }catch(e){alert("El pedido se marcó, pero no pudimos preparar el mensaje: "+e.message)}
 }
 
+let shipDaneMatches=[];
+
 async function resolveDaneCity(cityLabel){
  const raw=String(cityLabel||"").trim();
  const comma=raw.lastIndexOf(",");
@@ -107,9 +110,62 @@ async function resolveDaneCity(cityLabel){
  try{
   const qs="/api/dane?city="+encodeURIComponent(city)+(department?"&department="+encodeURIComponent(department):"");
   const r=await fetch(qs);const d=await r.json();
-  if(d.ok&&d.matches?.length===1)return d.matches[0].dane;
- }catch(_){}
+  shipDaneMatches=Array.isArray(d.matches)?d.matches:[];
+  if(shipDaneMatches.length===1)return shipDaneMatches[0].dane;
+ }catch(_){shipDaneMatches=[]}
  return "";
+}
+
+async function prepareDaneSelector(cityLabel){
+ const select=document.getElementById("shipDepartment");
+ const codeInput=document.getElementById("shipCode");
+ const raw=String(cityLabel||"").trim();
+ const comma=raw.lastIndexOf(",");
+ const city=comma>0?raw.slice(0,comma).trim():raw;
+ const selectedDepartment=comma>0?raw.slice(comma+1).trim():"";
+ select.innerHTML='<option value="">Buscando departamento...</option>';
+ select.disabled=true;
+ codeInput.value="";
+ codeInput.placeholder="Buscando código...";
+ shipDaneMatches=[];
+ const dane=await resolveDaneCity(raw);
+ const departments=[...new Map(shipDaneMatches.map(x=>[x.department,x])).values()].sort((a,b)=>a.department.localeCompare(b.department));
+ select.innerHTML='<option value="">Selecciona el departamento</option>'+departments.map(x=>'<option value="'+esc(x.department)+'">'+esc(x.department)+'</option>').join("");
+ if(selectedDepartment && departments.some(x=>x.department.toLowerCase()===selectedDepartment.toLowerCase())){
+  select.value=departments.find(x=>x.department.toLowerCase()===selectedDepartment.toLowerCase()).department;
+ }
+ select.disabled=departments.length<=1;
+ if(dane){
+  codeInput.value=dane;
+  codeInput.placeholder="Código DANE";
+  return dane;
+ }
+ if(shipDaneMatches.length>1){
+  codeInput.placeholder="Selecciona el departamento";
+  return "";
+ }
+ const fallback=DANE[city.toLowerCase()]||"";
+ if(fallback){
+  codeInput.value=fallback;
+  codeInput.placeholder="Código DANE";
+  return fallback;
+ }
+ codeInput.placeholder="No se pudo identificar automáticamente";
+ return "";
+}
+
+async function selectShipDepartment(){
+ const dep=document.getElementById("shipDepartment").value;
+ const match=shipDaneMatches.find(x=>x.department===dep);
+ const codeInput=document.getElementById("shipCode");
+ if(match){
+  codeInput.value=match.dane;
+  codeInput.placeholder="Código DANE";
+  document.getElementById("shippingMsg").textContent="Destino identificado automáticamente: "+match.city+", "+match.department+" · DANE "+match.dane;
+ }else{
+  codeInput.value="";
+  codeInput.placeholder="Selecciona el departamento";
+ }
 }
 
 async function openShipping(id){
@@ -125,13 +181,21 @@ async function openShipping(id){
   const department=comma>0?cityLabel.slice(comma+1).trim():"";
   document.getElementById("shippingOrderInfo").textContent=(currentCustomer.name||"Cliente")+" · "+money(currentOrder.total)+(department?" · "+city+", "+department:"");
   document.getElementById("shipCity").value=city;
-  let dane=currentOrder.shipping_destination_code||DANE[city.toLowerCase()]||"";
-  if(!dane)dane=await resolveDaneCity(cityLabel);
-  document.getElementById("shipCode").value=dane;
+  const savedDane=currentOrder.shipping_destination_code||"";
   document.getElementById("shipCedula").value=(currentOrder.address||"").match(/CÉDULA:\s*([0-9]+)/i)?.[1]||"";
   updateCedulaField();
-  document.getElementById("shippingMsg").textContent=dane?"Código DANE identificado automáticamente: "+dane:"";
+  document.getElementById("shippingMsg").textContent="Identificando municipio y código DANE...";
   document.getElementById("shippingModal").classList.add("open");
+  let dane=savedDane;
+  if(dane){
+   document.getElementById("shipCode").value=dane;
+   const depSelect=document.getElementById("shipDepartment");
+   if(department){depSelect.innerHTML='<option value="'+esc(department)+'">'+esc(department)+'</option>';depSelect.value=department;depSelect.disabled=true;}
+  }else{
+   dane=await prepareDaneSelector(cityLabel);
+  }
+  document.getElementById("shippingMsg").textContent=dane?"Código DANE identificado automáticamente: "+dane:(shipDaneMatches.length>1?"Este municipio existe en varios departamentos. Selecciona el departamento para identificar el código DANE.":"No pudimos identificar automáticamente el código DANE. Revisa el municipio.");
+
  }catch(e){alert(e.message)}
 }
 function closeShipping(){document.getElementById("shippingModal").classList.remove("open");currentOrder=null;currentCustomer=null}
