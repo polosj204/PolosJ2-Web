@@ -61,7 +61,18 @@ async function call99(path, body) {
 export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method === "GET") return res.status(200).json({ ok: true, configured: Boolean(process.env.NINETY_NINE_ENVIOS_EMAIL && process.env.NINETY_NINE_ENVIOS_PASSWORD) });
+  if (req.method === "GET") {
+    const test = String(req.query?.test || "");
+    if (test === "login") {
+      try {
+        await getToken();
+        return res.status(200).json({ ok: true, login_ok: true });
+      } catch (e) {
+        return res.status(e.status || 500).json({ ok: false, login_ok: false, error: e.message || "Error de login." });
+      }
+    }
+    return res.status(200).json({ ok: true, configured: Boolean(process.env.NINETY_NINE_ENVIOS_EMAIL && process.env.NINETY_NINE_ENVIOS_PASSWORD) });
+  }
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método no permitido." });
 
   try {
