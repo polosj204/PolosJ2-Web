@@ -98,21 +98,41 @@ async function deliver(id){
  }catch(e){alert("El pedido se marcó, pero no pudimos preparar el mensaje: "+e.message)}
 }
 
-function openShipping(id){
- api("/rest/v1/orders?select=*&id=eq."+id).then(async rows=>{
+async function resolveDaneCity(cityLabel){
+ const raw=String(cityLabel||"").trim();
+ const comma=raw.lastIndexOf(",");
+ const city=comma>0?raw.slice(0,comma).trim():raw;
+ const department=comma>0?raw.slice(comma+1).trim():"";
+ if(!city)return "";
+ try{
+  const qs="/api/dane?city="+encodeURIComponent(city)+(department?"&department="+encodeURIComponent(department):"");
+  const r=await fetch(qs);const d=await r.json();
+  if(d.ok&&d.matches?.length===1)return d.matches[0].dane;
+ }catch(_){}
+ return "";
+}
+
+async function openShipping(id){
+ try{
+  const rows=await api("/rest/v1/orders?select=*&id=eq."+id);
   if(!rows.length)throw Error("Pedido no encontrado");
   currentOrder=rows[0];
   const cs=await api("/rest/v1/customers?select=*&id=eq."+currentOrder.customer_id);
   currentCustomer=cs[0]||{};
-  const city=currentCustomer.city||"";
-  document.getElementById("shippingOrderInfo").textContent=(currentCustomer.name||"Cliente")+" · "+money(currentOrder.total);
+  const cityLabel=String(currentCustomer.city||"").trim();
+  const comma=cityLabel.lastIndexOf(",");
+  const city=comma>0?cityLabel.slice(0,comma).trim():cityLabel;
+  const department=comma>0?cityLabel.slice(comma+1).trim():"";
+  document.getElementById("shippingOrderInfo").textContent=(currentCustomer.name||"Cliente")+" · "+money(currentOrder.total)+(department?" · "+city+", "+department:"");
   document.getElementById("shipCity").value=city;
-  document.getElementById("shipCode").value=currentOrder.shipping_destination_code||DANE[city.trim().toLowerCase()]||"";
+  let dane=currentOrder.shipping_destination_code||DANE[city.toLowerCase()]||"";
+  if(!dane)dane=await resolveDaneCity(cityLabel);
+  document.getElementById("shipCode").value=dane;
   document.getElementById("shipCedula").value=(currentOrder.address||"").match(/CÉDULA:\s*([0-9]+)/i)?.[1]||"";
   updateCedulaField();
-  document.getElementById("shippingMsg").textContent="";
+  document.getElementById("shippingMsg").textContent=dane?"Código DANE identificado automáticamente: "+dane:"";
   document.getElementById("shippingModal").classList.add("open");
- }).catch(e=>alert(e.message));
+ }catch(e){alert(e.message)}
 }
 function closeShipping(){document.getElementById("shippingModal").classList.remove("open");currentOrder=null;currentCustomer=null}
 
