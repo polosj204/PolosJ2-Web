@@ -120,8 +120,8 @@ src="https://www.facebook.com/tr?id=4585248965093888&ev=PageView&noscript=1"/></
 </select><div id="departmentHelp" class="note">Selecciona el departamento donde está el municipio.</div></div>
 <div class="field"><label>Tipo de entrega *</label><select id="delivery" onchange="toggleDeliveryFields()"><option value="domicilio">Entrega a domicilio</option><option value="oficina">Oficina Interrapidísimo</option></select></div>
 <div id="homeFields"><div class="grid2"><div class="field"><label>Barrio *</label><input id="neighborhood" placeholder="Tu barrio"></div><div class="field"><label>Dirección de entrega *</label><input id="address" autocomplete="street-address" placeholder="Calle, carrera, número, complemento"></div></div></div>
-<div id="officeFields" class="office-only">
-<div class="field"><label>Oficina de entrega *</label><select id="office" onchange="selectOffice()"><option value="">Primero selecciona municipio y departamento</option></select><div id="officeHelp" class="note">Selecciona el municipio y departamento para consultar las oficinas disponibles.</div></div>
+<div id="officeFields" class="office-only" data-checkout-office-version="2026-10-06-v2">
+<div class="field"><label>Oficina de entrega Interrapidísimo *</label><select id="office" onchange="selectOffice()"><option value="">Primero selecciona municipio y departamento</option></select><div id="officeHelp" class="note">Selecciona el municipio y departamento para consultar las oficinas disponibles.</div></div>
 <div class="field"><label>Número de cédula *</label><input id="cedula" inputmode="numeric" placeholder="Número de cédula para reclamar en Interrapidísimo"></div>
 <p class="note">Te mostraremos únicamente las oficinas que 99 Envíos reporta como disponibles para ese municipio.</p>
 </div>
@@ -188,7 +188,7 @@ function selectOffice(){
 function toggleDeliveryFields(){
 const office=val('delivery')==='oficina';
 document.getElementById('homeFields').style.display=office?'none':'block';
-document.getElementById('officeFields').classList.toggle('show',office);
+document.getElementById('officeFields').classList.toggle('show',office);document.getElementById('officeFields').style.display=office?'block':'none';
 document.getElementById('neighborhood').required=!office;
 document.getElementById('address').required=!office;
 document.getElementById('cedula').required=office;
