@@ -37,8 +37,13 @@ async function getToken() {
 function normalizePayload(action, payload) {
   const p = { ...payload };
   if (typeof p.fecha === "string") {
-    const m = p.fecha.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    const raw = p.fecha.trim();
+    let m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
     if (m) p.fecha = String(Number(m[1])) + "-" + String(Number(m[2])) + "-" + m[3];
+    else {
+      m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) p.fecha = String(Number(m[3])) + "-" + String(Number(m[2])) + "-" + m[1];
+    }
   }
   return p;
 }
@@ -81,6 +86,7 @@ export default async function handler(req, res) {
   }
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método no permitido." });
 
+  let safePayload = null;
   try {
     const { action, payload } = req.body || {};
     if (!["cotizar", "preenvio"].includes(action)) {
@@ -89,7 +95,7 @@ export default async function handler(req, res) {
     if (!payload || typeof payload !== "object") {
       return res.status(400).json({ ok: false, error: "Falta payload." });
     }
-    const safePayload = normalizePayload(action, payload);
+    safePayload = normalizePayload(action, payload);
     const result = await call99("/" + action, safePayload);
     return res.status(200).json({ ok: true, data: result.data, upstream_status: result.status, upstream_raw: result.raw, upstream_headers: result.headers });
   } catch (e) {
@@ -99,7 +105,8 @@ export default async function handler(req, res) {
       details: e.data || null,
       upstream_status: e.responseStatus || null,
       upstream_raw: e.raw || "",
-      upstream_headers: e.responseHeaders || null
+      upstream_headers: e.responseHeaders || null,
+      normalized_fecha: safePayload?.fecha || null
     });
   }
 }
