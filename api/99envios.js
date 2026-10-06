@@ -34,6 +34,15 @@ async function getToken() {
   return cachedToken;
 }
 
+function normalizePayload(action, payload) {
+  const p = { ...payload };
+  if (typeof p.fecha === "string") {
+    const m = p.fecha.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (m) p.fecha = String(Number(m[1])) + "-" + String(Number(m[2])) + "-" + m[3];
+  }
+  return p;
+}
+
 async function call99(path, body) {
   const token = await getToken();
   const r = await fetch(API_BASE + path, {
@@ -80,7 +89,8 @@ export default async function handler(req, res) {
     if (!payload || typeof payload !== "object") {
       return res.status(400).json({ ok: false, error: "Falta payload." });
     }
-    const result = await call99("/" + action, payload);
+    const safePayload = normalizePayload(action, payload);
+    const result = await call99("/" + action, safePayload);
     return res.status(200).json({ ok: true, data: result.data, upstream_status: result.status, upstream_raw: result.raw, upstream_headers: result.headers });
   } catch (e) {
     return res.status(e.status || 500).json({
