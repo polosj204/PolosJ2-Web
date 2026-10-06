@@ -133,7 +133,7 @@ function normalizeQuotes(raw){
  return list;
 }
 function quoteValue(q){
- return Number(q.valor||0)+Number(q.valor_contrapago||0)+Number(q.comision_interna||q.valor_interna||0)+Number(q.sobreflete||0)+Number(q.seguro99||0);
+ return Number(q.valor_contrapago||q.valor||0)+Number(q.comision_interna||q.valor_interna||0)+Number(q.sobreflete||0)+Number(q.seguro99||0);
 }
 function parseAddress(raw){
  const s=String(raw||"");const parts=s.split(" · ");
@@ -165,9 +165,9 @@ async function generateShipping(){
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
     Destinatario:{
       tipoDocumento:"CC",numeroDocumento:cedula||"0000000000",nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
-      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code.slice(0,5),correo:currentCustomer.email||""
+      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code,correo:currentCustomer.email||""
     },
-    observaciones:"Pedido PolosJ2",
+    Observaciones:"Pedido PolosJ2",
     transportadora:{pais:"colombia",nombre:chosen.carrierName},
     origenCreacion:1
   };
