@@ -158,7 +158,7 @@ async function generateShipping(){
  const city=document.getElementById("shipCity").value.trim(),code=document.getElementById("shipCode").value.trim(),cedula=document.getElementById("shipCedula").value.trim(),weight=Number(document.getElementById("shipWeight").value)||1;
  if(!city||!/^\d{8}$/.test(code)){msg.className="msg bad";msg.textContent="Necesitamos la ciudad y el código DANE de 8 dígitos.";return}
  btn.disabled=true;msg.className="msg";msg.textContent="Cotizando con 99 Envíos...";
- const addr=parseAddress(currentOrder.address), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
+ const addr=parseAddress(currentCustomer.address||currentOrder.address), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
  if(!addr.direccion && !addr.office){msg.className="msg bad";msg.textContent="El pedido no tiene una dirección de entrega registrada. Revisa la dirección del pedido antes de generar el envío.";btn.disabled=false;return}
  const quotePayload={
   destino:{nombre:city,codigo:code},
