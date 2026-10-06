@@ -151,15 +151,15 @@ async function generateShipping(){
  const quotePayload={
   destino:{nombre:city,codigo:code},
   origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},
-  idTipoEntrega:1,idServicio:2,valorDeclarado:Number(currentOrder.total)||0,peso:weight,alto:10,largo:10,ancho:10,
-  fecha:dateDMY(),seguro99:false,seguro99plus:true,aplicaContrapago:contra
+  idTipoEntrega:1,idServicio:1,valorDeclarado:Number(currentOrder.total)||0,peso:weight,alto:10,largo:10,ancho:10,
+  fecha:dateDMY(),seguro99:false,seguro99plus:false,AplicaContrapago:contra
  };
  try{
   const qr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cotizar",payload:quotePayload})});
   const qj=await qr.json();if(!qr.ok||!qj.ok)throw Error(qj.error||"No se pudo cotizar.");
   const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
   const chosen=quotes.sort((a,b)=>quoteValue(b)-quoteValue(a))[0],shippingCost=quoteValue(chosen);
-  msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.transportadora?.nombre||"transportadora")+". Generando preenvío...";
+  msg.textContent="Cotización encontrada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
     idTipoEntrega:1,idServicio:Number(chosen.idservicio||1),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:false,seguro99plus:false,
