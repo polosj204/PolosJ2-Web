@@ -148,7 +148,7 @@ export default async function handler(req,res){
         let offices=[];
         try{
           const token=await getToken();
-          const candidates=[dane,dane.slice(0,5)].filter((v,i,a)=>/^\\d{5,8}$/.test(v)&&a.indexOf(v)===i);
+          const candidates=[dane,dane.slice(0,5)].filter((v,i,a)=>/^\d{5,8}$/.test(v)&&a.indexOf(v)===i);
           for(const code of candidates){
             const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+code,{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://app.99envios.app",Referer:"https://app.99envios.app/"}});
             const raw=await rr.text();let data=[];try{data=raw?JSON.parse(raw):[]}catch(_){}
