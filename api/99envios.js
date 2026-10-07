@@ -63,7 +63,7 @@ export default async function handler(req,res){
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
-        if(!/^\\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
+        if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
         const token=await getToken();
         const r=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
         const raw=await r.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
