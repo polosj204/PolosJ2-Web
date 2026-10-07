@@ -173,18 +173,22 @@ async function loadOfficeOptions(){
   const r=await fetch('/api/99envios?action=oficinas&dane='+encodeURIComponent(dane));
   const d=await r.json();
   if(!r.ok||!d.ok) throw new Error(d.error||'No se pudieron consultar las oficinas.');
-  officeOptions=Array.isArray(d.offices)?d.offices:[];
+  // Solo permitimos oficinas cuyo ID sea un IdCentroServicio real de 99 Envíos.
+  // Los IDs de Aveonline u otras fuentes de respaldo no sirven para generar la guía.
+  officeOptions=(Array.isArray(d.offices)?d.offices:[]).filter(o=>
+    d.source==='99envios' && o?.source==='99envios' && /^\d+$/.test(String(o.id||'')) && o.address
+  );
   if(!officeOptions.length){
-    select.innerHTML='<option value="">No hay oficinas disponibles</option>';
-    help.textContent='No encontramos oficinas activas para este municipio.';
+    select.innerHTML='<option value="">No hay oficinas compatibles</option>';
+    help.textContent='99 Envíos no devolvió una oficina con IdCentroServicio válido para este municipio. No mostraremos oficinas de respaldo que luego no puedan generar la guía.';
     return;
   }
   select.innerHTML='<option value="">Selecciona una oficina</option>'+officeOptions.map(o=>{
-    const label=[o.address,o.name&&o.name!==o.address?o.name:''].filter(Boolean).join(' · ');
+    const label=[o.address,o.name&&o.name!==o.address?'': ''].filter(Boolean).join(' · ');
     return '<option value="'+String(o.id||'').replace(/"/g,'&quot;')+'">'+label.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>';
   }).join('');
   select.disabled=false;
-  help.textContent='✓ '+officeOptions.length+' oficina(s) disponible(s) para este municipio'+(d.source==='99envios'?' según 99 Envíos.':'.');
+  help.textContent='✓ '+officeOptions.length+' oficina(s) disponible(s) para este municipio según 99 Envíos.';
  }catch(e){
   select.innerHTML='<option value="">No se pudieron consultar</option>';help.textContent=e.message||'No se pudieron consultar las oficinas.';
  }
