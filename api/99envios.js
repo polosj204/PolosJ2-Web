@@ -140,6 +140,12 @@ export default async function handler(req,res){
         return res.status(200).json({ok:true,total:rows.length,samples});
       }
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
+      if(action==="oficinas_historicas"){
+        const city=String(req.query?.city||"").trim();
+        if(!city) return res.status(400).json({ok:false,error:"Falta la ciudad."});
+        const offices=await getHistoricalOfficeOptions(city);
+        return res.status(200).json({ok:true,city,offices});
+      }
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
         if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
