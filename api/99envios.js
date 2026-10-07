@@ -148,8 +148,15 @@ export default async function handler(req,res){
         let offices=[];
         try{
           const token=await getToken();
-          const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://app.99envios.app",Referer:"https://app.99envios.app/"}});const raw=await rr.text();let data=[];try{data=raw?JSON.parse(raw):[]}catch(_){}
-          if(rr.ok&&Array.isArray(data)) offices=data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||""),source:"99envios"}}).filter(x=>x.id&&x.address);
+          const candidates=[dane,dane.slice(0,5)].filter((v,i,a)=>/^\\d{5,8}$/.test(v)&&a.indexOf(v)===i);
+          for(const code of candidates){
+            const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+code,{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://app.99envios.app",Referer:"https://app.99envios.app/"}});
+            const raw=await rr.text();let data=[];try{data=raw?JSON.parse(raw):[]}catch(_){}
+            if(rr.ok&&Array.isArray(data)){
+              offices=data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||""),source:"99envios"}}).filter(x=>x.id&&x.address);
+              if(offices.length) break;
+            }
+          }
         }catch(_){}
         if(!offices.length){
           try{
