@@ -1,9 +1,16 @@
 export default async function handler(req,res){
-  try{
-    const r=await fetch("https://99envios.app/static/js/1523.b8f296e5.js");
-    const js=await r.text();
-    const urls=[...js.matchAll(/https?:\/\/[^"'\\s)]+/g)].map(m=>m[0]);
-    const paths=[...js.matchAll(/["'`]([^"'`]{0,300}(?:api|pedido|envio|guia|histor|sucursal|masivo|novedad)[^"'`]{0,300})["'`]/gi)].map(m=>m[1]);
-    return res.status(200).json({ok:r.ok,status:r.status,length:js.length,urls:[...new Set(urls)],paths:[...new Set(paths)].slice(0,1000)});
-  }catch(e){return res.status(502).json({ok:false,error:e.message});}
+  const paths=[
+    "/static/js/1523.b8f296e5.js",
+    "/static/js/1523.b8f296e5.chunk.js",
+    "/static/js/1523.js"
+  ];
+  const out=[];
+  for(const p of paths){
+    try{
+      const r=await fetch("https://99envios.app"+p);
+      const t=await r.text();
+      out.push({p,status:r.status,type:r.headers.get("content-type"),length:t.length,head:t.slice(0,120)});
+    }catch(e){out.push({p,error:e.message});}
+  }
+  return res.status(200).json(out);
 }
