@@ -77,17 +77,25 @@ export default async function handler(req,res){
             }
           });
           const raw=await rr.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
-          if(rr.ok && Array.isArray(data)){
-            const offices=data.map(x=>{
-              const c=x?.CentroServicio||{};
+          // Normalizamos los formatos de respuesta conocidos de 99 Envíos.
+          const rows =
+            Array.isArray(data) ? data :
+            Array.isArray(data?.data) ? data.data :
+            Array.isArray(data?.result) ? data.result :
+            Array.isArray(data?.results) ? data.results :
+            Array.isArray(data?.items) ? data.items : [];
+          if(rr.ok && rows.length){
+            const offices=rows.map(x=>{
+              const c=x?.CentroServicio||x?.centroServicio||x?.centro_servicio||x?.office||x||{};
               return {
-                id:String(c.IdCentroServicio||""),
-                address:String(c.Direccion||""),
-                city:String(c.Ciudad||""),
-                department:String(c.Departamento||""),
+                id:String(c.IdCentroServicio??c.idCentroServicio??c.id??""),
+                address:String(c.Direccion??c.direccion??c.address??""),
+                city:String(c.Ciudad??c.ciudad??c.city??""),
+                department:String(c.Departamento??c.departamento??c.department??""),
+                name:String(c.Nombre??c.nombre??c.name??""),
                 source:"99envios"
               };
-            }).filter(x=>x.id&&x.address);
+            }).filter(x=>/^\d+$/.test(x.id)&&x.address);
             if(offices.length) return res.status(200).json({ok:true,source:"99envios",offices});
           }
         }catch(_){}
@@ -107,7 +115,8 @@ export default async function handler(req,res){
               city:String(o.city||""),
               department:"",
               name:String(o.name||"Interrapidísimo"),
-              source:"aveonline"
+              source:"aveonline",
+              usable:false
             })).filter(x=>x.address||x.name);
             if(offices.length) return res.status(200).json({ok:true,source:"aveonline",offices});
           }
