@@ -297,13 +297,25 @@ async function generateShipping(){
  const addr=parseAddress((isOfficeOrder()&&currentOrder.office_address)?currentOrder.office_address:(currentCustomer.address||currentOrder.address)), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
  const office=isOfficeOrder();
  const insurance99=!office, insurance99plus=office;
+ let centerId=officeCenterId();
  if(office && String(currentOrder.office_center_id||"").startsWith("ave:")){
-   msg.className="msg bad";
-   msg.textContent="Este pedido tiene una oficina seleccionada desde la base de respaldo, pero 99 Envíos no entregó su IdCentroServicio. No generaremos una guía de oficina con un ID incorrecto.";
-   btn.disabled=false;
-   return;
+   msg.textContent="Confirmando la oficina con 99 Envíos...";
+   try{
+     const rr=await fetch(API99+"?action=resolver_oficina&dane="+encodeURIComponent(code)+"&address="+encodeURIComponent(currentOrder.office_address||""));
+     const rd=await rr.json();
+     if(!rr.ok||!rd.ok||!rd.office?.id) throw Error(rd.error||"No pudimos confirmar el IdCentroServicio de la oficina.");
+     centerId=Number(rd.office.id);
+     if(!Number.isFinite(centerId)||centerId<=0) throw Error("99 Envíos devolvió un IdCentroServicio inválido.");
+     await api("/rest/v1/orders?id=eq."+currentOrder.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({office_center_id:String(centerId),office_address:rd.office.address||currentOrder.office_address||""})});
+     currentOrder.office_center_id=String(centerId);
+   }catch(e){
+     msg.className="msg bad";
+     msg.textContent="No se generará la guía de oficina hasta confirmar la sucursal en 99 Envíos. "+e.message;
+     btn.disabled=false;
+     return;
+   }
  }
- if(office && !currentOrder.office_center_id){
+ if(office && (!centerId || !Number.isFinite(centerId) || centerId<=0)){
    msg.className="msg bad";
    msg.textContent="Este pedido de oficina no tiene un IdCentroServicio válido de 99 Envíos. No generaremos el envío.";
    btn.disabled=false;
@@ -324,7 +336,7 @@ async function generateShipping(){
   msg.textContent="Cotización seleccionada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
     IdTipoEntrega:office?2:1,IdServicio:office?2:1,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
-    ...(office?{IdCentroServicio:officeCenterId()}:{}),
+    ...(office?{IdCentroServicio:centerId}:{}),
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
     Destinatario:{
       tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
