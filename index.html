@@ -184,7 +184,7 @@ async function loadOfficeOptions(){
     return;
   }
   select.innerHTML='<option value="">Selecciona una oficina</option>'+officeOptions.map(o=>{
-    const label=[o.address,o.name&&o.name!==o.address?'': ''].filter(Boolean).join(' · ');
+    const label=[o.address,o.name&&o.name!==o.address?o.name:''].filter(Boolean).join(' · ');
     return '<option value="'+String(o.id||'').replace(/"/g,'&quot;')+'">'+label.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>';
   }).join('');
   select.disabled=false;
