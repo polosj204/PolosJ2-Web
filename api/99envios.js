@@ -44,7 +44,7 @@ async function getHistoricalOfficeOptions(cityName){
     const addr=String(row.direccion_destinatario||"");
     const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);
     if(!m || normOffice(city)!==wanted) continue;
-    const address=addr.replace(/\\s*\\(OFC:\\s*[0-9]+\\)\\s*/i,"").trim();
+    const address=addr.replace(/\s*\(OFC:\s*[0-9]+\)\s*/i,"").trim();
     const id=String(m[1]);
     const key=id+"|"+normOffice(address);
     if(!seen.has(key)) seen.set(key,{id,address,city,source:"99envios",name:"Oficina Interrapidísimo"});
