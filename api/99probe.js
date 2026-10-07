@@ -1,9 +1,12 @@
 export default async function handler(req,res){
   try{
-    const r=await fetch("https://99envios.app/static/js/1523.b8f296e5.chunk.js");
-    const js=await r.text();
-    const n="https://99envios.online/api/v1/historico-envios-completos";
-    const p=js.indexOf(n);
-    return res.status(200).json({ok:r.ok,context:p>=0?js.slice(Math.max(0,p-3500),Math.min(js.length,p+4500)):"not-found"});
+    const url=new URL("https://99envios.online/api/v1/historico-envios-completos");
+    url.searchParams.set("codigo_sucursal","669785");
+    url.searchParams.set("fecha_inicio","2025-10-01");
+    url.searchParams.set("fecha_fin","2026-10-07");
+    const r=await fetch(url,{headers:{Accept:"application/json"}});
+    const text=await r.text();
+    let data; try{data=JSON.parse(text)}catch(_){data=text.slice(0,2000)}
+    return res.status(200).json({ok:r.ok,status:r.status,type:r.headers.get("content-type"),data});
   }catch(e){return res.status(502).json({ok:false,error:e.message});}
 }
