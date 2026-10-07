@@ -1,5 +1,7 @@
 const API_BASE = "https://integration.99envios.app/api/integration/v1";
 const HISTORY_BASE = "https://api.99envios.app/api/online";
+const AVE_BASE = "https://api.aveonline.co/api-oficinas/public/api/v1/offices";
+let officeCache = new Map();
 let cachedToken = null;
 let cachedAt = 0;
 
@@ -18,6 +20,11 @@ async function getToken(){
   if(!r.ok||!d.token) throw Object.assign(new Error(d.message||d.error||"Login rechazado"),{status:r.status||502});
   cachedToken=d.token; cachedAt=Date.now(); return cachedToken;
 }
+function normOffice(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/CARRERA/g,"CR").replace(/CRA\.?/g,"CR").replace(/KR\.?/g,"CR").replace(/CALLE/g,"CL").replace(/CL\.?/g,"CL").replace(/[^A-Z0-9]/g,"");}
+function officeAddressVariants(v){const raw=String(v||"");return [raw,raw.replace(/OFICINA INTERRAPID[IÍ]SIMO[^·]*·?/i,"")].map(normOffice).filter(Boolean);}
+async function getAveOffices(dane){const r=await fetch(AVE_BASE+"/1016/"+encodeURIComponent(dane),{headers:{Accept:"application/json"}});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch(_){}if(!r.ok)return [];const rows=Array.isArray(d?.data)?d.data:[];return rows.map(o=>({id:String(o.id||""),name:String(o.name||"Oficina Interrapidísimo"),address:String(o.location||""),city:String(o.city||"")})).filter(x=>x.address||x.name);}
+async function getHistoricalOfficeMap(){const c=officeCache.get("__history__");if(c&&Date.now()-c.at<1800000)return c.map;const map=new Map();for(let page=1;page<=8;page++){const d=await callOnline("/envios_completos_v2/9002",{page,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07"});for(const row of Array.isArray(d.data)?d.data:[]){const addr=String(row.direccion_destinatario||"");const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);if(!m)continue;for(const v of officeAddressVariants(addr))map.set(v,m[1]);}if(page>=Number(d.last_page||page))break;}officeCache.set("__history__",{at:Date.now(),map});return map;}
+async function enrichOfficeIds(offices){const hist=await getHistoricalOfficeMap();return offices.map(o=>{let id=o.id||"",source=o.source||"aveonline";for(const v of officeAddressVariants(o.address)){if(hist.has(v)){id=hist.get(v);source="99envios";break;}}return {...o,id,source};});}
 async function callOnline(path,query={}){
   const token=await getToken();
   const u=new URL(HISTORY_BASE+path);
@@ -64,65 +71,27 @@ export default async function handler(req,res){
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
         if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
-
-        // Fuente primaria: endpoint que 99 Envíos utiliza para consultar sus sucursales.
+        const cached=officeCache.get(dane);
+        if(cached && Date.now()-cached.at<1800000) return res.status(200).json({ok:true,source:"99envios",offices:cached.offices});
+        let offices=[];
         try{
           const token=await getToken();
-          const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{
-            headers:{
-              Authorization:"Bearer "+token,
-              Accept:"application/json",
-              Origin:"https://app.99envios.app",
-              Referer:"https://app.99envios.app/"
-            }
-          });
-          const raw=await rr.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
-          // Normalizamos los formatos de respuesta conocidos de 99 Envíos.
-          const rows =
-            Array.isArray(data) ? data :
-            Array.isArray(data?.data) ? data.data :
-            Array.isArray(data?.result) ? data.result :
-            Array.isArray(data?.results) ? data.results :
-            Array.isArray(data?.items) ? data.items : [];
-          if(rr.ok && rows.length){
-            const offices=rows.map(x=>{
-              const c=x?.CentroServicio||x?.centroServicio||x?.centro_servicio||x?.office||x||{};
-              return {
-                id:String(c.IdCentroServicio??c.idCentroServicio??c.id??""),
-                address:String(c.Direccion??c.direccion??c.address??""),
-                city:String(c.Ciudad??c.ciudad??c.city??""),
-                department:String(c.Departamento??c.departamento??c.department??""),
-                name:String(c.Nombre??c.nombre??c.name??""),
-                source:"99envios"
-              };
-            }).filter(x=>/^\d+$/.test(x.id)&&x.address);
-            if(offices.length) return res.status(200).json({ok:true,source:"99envios",offices});
-          }
+          const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://app.99envios.app",Referer:"https://app.99envios.app/"}});const raw=await rr.text();let data=[];try{data=raw?JSON.parse(raw):[]}catch(_){}
+          if(rr.ok&&Array.isArray(data)) offices=data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||""),source:"99envios"}}).filter(x=>x.id&&x.address);
         }catch(_){}
-
-        // Respaldo: oficinas activas de Interrapidísimo. Su ID NO se trata como
-        // IdCentroServicio de 99 Envíos; queda marcado para no generar guías incorrectas.
-        try{
-          const ave=await fetch("https://api.aveonline.co/api-oficinas/public/api/v1/offices/1016/"+encodeURIComponent(dane),{
-            headers:{Accept:"application/json"}
-          });
-          const raw=await ave.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
-          if(ave.ok){
-            const rows=Array.isArray(data?.data)?data.data:[];
-            const offices=rows.map((o,i)=>({
-              id:"ave:"+dane+":"+String(i+1),
-              address:String(o.location||""),
-              city:String(o.city||""),
-              department:"",
-              name:String(o.name||"Interrapidísimo"),
-              source:"aveonline",
-              usable:false
-            })).filter(x=>x.address||x.name);
-            if(offices.length) return res.status(200).json({ok:true,source:"aveonline",offices});
-          }
-        }catch(_){}
-
-        return res.status(200).json({ok:true,source:"none",offices:[]});
+        if(!offices.length) offices=await enrichOfficeIds(await getAveOffices(dane));
+        officeCache.set(dane,{at:Date.now(),offices});
+        return res.status(200).json({ok:true,source:offices.some(x=>x.source==="99envios")?"99envios":"aveonline",offices});
+      }
+      if(action==="resolver_oficina"){
+        const dane=String(req.query?.dane||"").trim(),address=String(req.query?.address||"").trim();
+        if(!/^\d{8}$/.test(dane)||!address)return res.status(400).json({ok:false,error:"DANE y dirección de oficina son obligatorios."});
+        let offices=officeCache.get(dane)?.offices||[];
+        if(!offices.length) offices=await enrichOfficeIds(await getAveOffices(dane));
+        const wanted=officeAddressVariants(address);
+        const match=offices.find(o=>wanted.some(w=>officeAddressVariants(o.address).some(v=>w===v||w.includes(v)||v.includes(w))));
+        if(!match||!match.id||String(match.id).startsWith("ave:"))return res.status(404).json({ok:false,error:"No pudimos confirmar el IdCentroServicio de esta oficina en 99 Envíos."});
+        return res.status(200).json({ok:true,office:{...match,source:"99envios"}});
       }
       return res.status(200).json({ok:true,configured:true});
     }catch(e){return res.status(e.status||502).json({ok:false,error:e.message||"Error 99 Envíos."});}
