@@ -1,166 +1,91 @@
 const API_BASE = "https://integration.99envios.app/api/integration/v1";
+const HISTORY_BASE = "https://api.99envios.app/api/online";
 let cachedToken = null;
 let cachedAt = 0;
 
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "https://polosj2-web.vercel.app");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+function cors(res){
+  res.setHeader("Access-Control-Allow-Origin","https://polosj2-web.vercel.app");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type");
   return res;
 }
-
-async function getToken() {
-  if (cachedToken && Date.now() - cachedAt < 45 * 60 * 1000) return cachedToken;
-  const email = process.env.NINETY_NINE_ENVIOS_EMAIL;
-  const password = process.env.NINETY_NINE_ENVIOS_PASSWORD;
-  if (!email || !password) {
-    const err = new Error("99 Envíos aún no está configurado en Vercel. Faltan NINETY_NINE_ENVIOS_EMAIL y NINETY_NINE_ENVIOS_PASSWORD.");
-    err.status = 503;
-    throw err;
-  }
-  const r = await fetch(API_BASE + "/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || !data.token) {
-    const err = new Error(data.message || data.error || "99 Envíos rechazó el inicio de sesión.");
-    err.status = r.status || 502;
-    throw err;
-  }
-  cachedToken = data.token;
-  cachedAt = Date.now();
-  return cachedToken;
+async function getToken(){
+  if(cachedToken && Date.now()-cachedAt<45*60*1000) return cachedToken;
+  const email=process.env.NINETY_NINE_ENVIOS_EMAIL, password=process.env.NINETY_NINE_ENVIOS_PASSWORD;
+  if(!email||!password) throw Object.assign(new Error("99 Envíos no está configurado."),{status:503});
+  const r=await fetch(API_BASE+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.token) throw Object.assign(new Error(d.message||d.error||"Login rechazado"),{status:r.status||502});
+  cachedToken=d.token; cachedAt=Date.now(); return cachedToken;
 }
-
-function normalizePayload(action, payload) {
-  const p = { ...payload };
-
-  // 99 Envíos validates this field strictly as d-m-Y. Generate it
-  // server-side so browser formatting/caching cannot send dd-mm-yyyy.
-  // Use Colombia time because the shipment date is a local business date.
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric"
-  }).formatToParts(new Date());
-  const dateParts = {};
-  for (const part of parts) {
-    if (part.type !== "literal") dateParts[part.type] = part.value;
-  }
-  p.fecha = String(Number(dateParts.day)) + "-" + String(Number(dateParts.month)) + "-" + dateParts.year;
-
-  return p;
+async function callOnline(path,query={}){
+  const token=await getToken();
+  const u=new URL(HISTORY_BASE+path);
+  Object.entries(query).forEach(([k,v])=>u.searchParams.set(k,String(v)));
+  const r=await fetch(u,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+  const raw=await r.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
+  if(!r.ok) throw Object.assign(new Error(data.message||data.error||("HTTP "+r.status)),{status:r.status,data});
+  return data;
 }
-async function call99(path, body) {
-  const token = await getToken();
-  const r = await fetch(API_BASE + path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + token
-    },
-    body: JSON.stringify(body)
-  });
-  const rawText = await r.text();
-  let data = {};
-  try { data = rawText ? JSON.parse(rawText) : {}; } catch (_) { data = {}; }
-  const responseHeaders = { contentType: r.headers.get("content-type") || "", location: r.headers.get("location") || "" };
-  if (!r.ok) {
-    if (r.status === 401) {
-      cachedToken = null;
-      cachedAt = 0;
+function summarize(rows){
+  const cities=new Map(), offices=new Map();
+  for(const x of rows){
+    const city=String(x.ciudad_destino||"").split(/[\\/]/)[0].trim();
+    const addr=String(x.direccion_destinatario||"");
+    const marker=addr.toUpperCase().indexOf("(OFC:");
+    let officeId="";
+    if(marker>=0){const m=addr.slice(marker+5).match(/[0-9]+/); if(m) officeId=m[0];}
+    const isOffice=!!officeId||/OFICINA INTERRAPID/i.test(addr);
+    const c=cities.get(city)||{shipments:0,office_shipments:0}; c.shipments++; if(isOffice)c.office_shipments++; cities.set(city,c);
+    if(isOffice){
+      const key=city+"|"+(officeId||"sin_id");
+      const o=offices.get(key)||{city,office_id:officeId||"sin_id",shipments:0,addresses:[]};
+      o.shipments++; if(o.addresses.length<3&&!o.addresses.includes(addr))o.addresses.push(addr.slice(0,200)); offices.set(key,o);
     }
-    const err = new Error(data.message || data.error || JSON.stringify(data));
-    err.status = r.status || 502;
-    err.data = data;
-    err.raw = rawText;
-    err.responseStatus = r.status;
-    err.responseHeaders = responseHeaders;
-    throw err;
   }
-  return { status: r.status, data, raw: rawText, headers: responseHeaders };
+  return {total:rows.length,cities:[...cities.entries()].map(([city,v])=>({city,...v})).sort((a,b)=>b.shipments-a.shipments),offices:[...offices.values()].sort((a,b)=>a.city.localeCompare(b.city)||a.office_id.localeCompare(b.office_id))};
 }
-
-export default async function handler(req, res) {
+async function getHistory(){
+  const rows=[];
+  for(let page=1;page<=8;page++){
+    const d=await callOnline("/envios_completos_v2/9002",{page,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07"});
+    if(Array.isArray(d.data)) rows.push(...d.data);
+    if(page>=Number(d.last_page||page)) break;
+  }
+  return summarize(rows);
+}
+export default async function handler(req,res){
   cors(res);
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method === "GET") {
-    const action = String(req.query?.action || "");
-    if (action === "oficinas") {
-      const dane = String(req.query?.dane || "").trim();
-      if (!/^\d{8}$/.test(dane)) return res.status(400).json({ ok:false, error:"DANE inválido." });
-      try {
-        const token = await getToken();
-        const r = await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/" + encodeURIComponent(dane), {
-          method:"GET",
-          headers:{ Authorization:"Bearer " + token, Accept:"application/json" }
-        });
-        const raw = await r.text();
-        let data=[]; try { data = raw ? JSON.parse(raw) : []; } catch (_) {}
-        if (!r.ok) {
-          if (r.status === 401) { cachedToken=null; cachedAt=0; }
-          return res.status(r.status || 502).json({ok:false,error:"99 Envíos no pudo consultar las oficinas.",details:data,upstream_status:r.status});
-        }
-        const offices = Array.isArray(data) ? data.map(x => {
-          const c=x?.CentroServicio || {};
-          return { id:String(c.IdCentroServicio || ""), address:String(c.Direccion || ""), city:String(c.Ciudad || ""), department:String(c.Departamento || "") };
-        }).filter(x=>x.id && x.address) : [];
+  if(req.method==="OPTIONS") return res.status(204).end();
+  if(req.method==="GET"){
+    const action=String(req.query?.action||"");
+    try{
+      if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
+      if(action==="oficinas"){
+        const dane=String(req.query?.dane||"").trim();
+        if(!/^\\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
+        const token=await getToken();
+        const r=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+        const raw=await r.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
+        if(!r.ok) return res.status(r.status||502).json({ok:false,error:"99 Envíos no pudo consultar las oficinas.",details:data});
+        const offices=Array.isArray(data)?data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||"")}}).filter(x=>x.id&&x.address):[];
         return res.status(200).json({ok:true,offices});
-      } catch(e) {
-        return res.status(e.status || 502).json({ok:false,error:e.message || "Error consultando oficinas 99 Envíos."});
       }
-    }
-    return res.status(200).json({ ok: true, configured: Boolean(process.env.NINETY_NINE_ENVIOS_EMAIL && process.env.NINETY_NINE_ENVIOS_PASSWORD) });
+      return res.status(200).json({ok:true,configured:true});
+    }catch(e){return res.status(e.status||502).json({ok:false,error:e.message||"Error 99 Envíos."});}
   }
-  if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método no permitido." });
-
-  let safePayload = null;
-  try {
-    const { action, payload } = req.body || {};
-    if (!["cotizar", "preenvio"].includes(action)) {
-      return res.status(400).json({ ok: false, error: "Acción inválida. Usa cotizar o preenvio." });
-    }
-    if (!payload || typeof payload !== "object") {
-      return res.status(400).json({ ok: false, error: "Falta payload." });
-    }
-    safePayload = normalizePayload(action, payload);
-    let result;
-    try {
-      result = await call99("/" + action, safePayload);
-    } catch (firstError) {
-      // 99 Envíos has returned inconsistent validation around fecha. For
-      // cotización only (no shipment creation), retry once with the padded
-      // equivalent if the first request is specifically rejected on fecha.
-      const isDateValidation =
-        action === "cotizar" &&
-        firstError?.status === 422 &&
-        /fecha/i.test(firstError?.raw || "") &&
-        /format/i.test(firstError?.raw || "");
-      if (!isDateValidation) throw firstError;
-
-      const retryPayload = { ...safePayload };
-      const m = String(safePayload.fecha || "").match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-      if (!m) throw firstError;
-      retryPayload.fecha =
-        String(m[1]).padStart(2, "0") + "-" +
-        String(m[2]).padStart(2, "0") + "-" +
-        m[3];
-      safePayload = retryPayload;
-      result = await call99("/" + action, retryPayload);
-    }
-    return res.status(200).json({ ok: true, data: result.data, upstream_status: result.status, upstream_raw: result.raw, upstream_headers: result.headers });
-  } catch (e) {
-    return res.status(e.status || 500).json({
-      ok: false,
-      error: e.message || "Error conectando con 99 Envíos.",
-      details: e.data || null,
-      upstream_status: e.responseStatus || null,
-      upstream_raw: e.raw || "",
-      upstream_headers: e.responseHeaders || null,
-      normalized_fecha: safePayload?.fecha || null
-    });
-  }
+  if(req.method!=="POST") return res.status(405).json({ok:false,error:"Método no permitido."});
+  try{
+    const {action,payload}=req.body||{};
+    if(!["cotizar","preenvio"].includes(action)||!payload) return res.status(400).json({ok:false,error:"Solicitud inválida."});
+    const p={...payload};
+    const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Bogota",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());
+    const dp={}; for(const x of parts)if(x.type!=="literal")dp[x.type]=x.value;
+    p.fecha=String(Number(dp.day))+"-"+String(Number(dp.month))+"-"+dp.year;
+    const token=await getToken();
+    const r=await fetch(API_BASE+"/"+action,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
+    const raw=await r.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
+    if(!r.ok) return res.status(r.status||502).json({ok:false,error:data.message||data.error||raw,details:data,upstream_status:r.status});
+    return res.status(200).json({ok:true,data,upstream_status:r.status,upstream_raw:raw});
+  }catch(e){return res.status(e.status||502).json({ok:false,error:e.message});}
 }
