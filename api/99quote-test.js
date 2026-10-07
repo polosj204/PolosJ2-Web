@@ -15,17 +15,17 @@ export default async function handler(req, res) {
     const payload = {
       action: "cotizar",
       payload: {
-        destino: { nombre: "Bogotá", codigo: "11001000" },
-        origen: { nombre: "Bogotá", codigo: "11001000" },
-        IdTipoEntrega: 1,
-        IdServicio: 1,
+        destino: { nombre: "Turbo", codigo: "05837000", IdCentroServicio: 7969 },
+        origen: { nombre: "Bodega PolosJ2", codigo: "11001000" },
+        IdTipoEntrega: 2,
+        IdServicio: 2,
         valorDeclarado: 149900,
         peso: 1,
         alto: 10,
         largo: 10,
         ancho: 10,
         fecha,
-        seguro99: false,
+        seguro99: false,\n        seguro99plus: true,
         seguro99plus: false,
         AplicaContrapago: true
       }
