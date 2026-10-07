@@ -28,6 +28,35 @@ async function getToken(){
 function normOffice(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/CARRERA/g,"CR").replace(/CRA\.?/g,"CR").replace(/KR\.?/g,"CR").replace(/CALLE/g,"CL").replace(/CL\.?/g,"CL").replace(/[^A-Z0-9]/g,"");}
 function officeAddressVariants(v){const raw=String(v||"");return [raw,raw.replace(/OFICINA INTERRAPID[IÍ]SIMO[^·]*·?/i,"")].map(normOffice).filter(Boolean);}
 async function getAveOffices(dane){const r=await fetch(AVE_BASE+"/1016/"+encodeURIComponent(dane),{headers:{Accept:"application/json"}});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch(_){}if(!r.ok)return [];const rows=Array.isArray(d?.data)?d.data:[];return rows.map(o=>({id:String(o.id||""),name:String(o.name||"Oficina Interrapidísimo"),address:String(o.location||""),city:String(o.city||"")})).filter(x=>x.address||x.name);}
+async function get99OfficeCatalog(dane){
+  const token=await getToken();
+  const codes=[String(dane||"").trim(),String(dane||"").trim().slice(0,5)].filter((v,i,a)=>/^\\d{5,8}$/.test(v)&&a.indexOf(v)===i);
+  const bases=["https://integration1.99envios.app/api/sucursal/oficinas/","https://integration.99envios.app/api/sucursal/oficinas/"];
+  for(const base of bases){
+    for(const code of codes){
+      try{
+        const rr=await fetch(base+encodeURIComponent(code),{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"}});
+        const raw=await rr.text(); let data=null; try{data=raw?JSON.parse(raw):null}catch(_){}
+        if(!rr.ok||data==null) continue;
+        const candidates=[]; const add=v=>{if(Array.isArray(v)) candidates.push(v);};
+        add(data); add(data.data); add(data.oficinas); add(data.sucursales); add(data.centrosServicio); add(data.centros_servicio);
+        const rows=candidates.find(a=>a.some(x=>x&&typeof x==="object"))||[];
+        if(!rows.length) continue;
+        const offices=rows.map(x=>{
+          const c=x?.CentroServicio||x?.centroServicio||x?.sucursal||x?.oficina||x||{};
+          const id=c.IdCentroServicio??c.idCentroServicio??c.id_centro_servicio??c.idSucursal??c.id_sucursal??c.codigo_sucursal??c.id??"";
+          const address=c.Direccion??c.direccion??c.DireccionSucursal??c.direccion_sucursal??c.address??c.direccion_destino??"";
+          const city=c.Ciudad??c.ciudad??c.nombre_ciudad??c.city??"";
+          const name=c.Nombre??c.nombre??c.NombreSucursal??c.nombre_sucursal??c.name??"Oficina Interrapidísimo";
+          const department=c.Departamento??c.departamento??c.department??"";
+          return {id:String(id||""),address:String(address||""),city:String(city||""),department:String(department||""),name:String(name||"Oficina Interrapidísimo"),source:"99envios"};
+        }).filter(x=>/^\\d+$/.test(x.id)&&x.address);
+        if(offices.length) return offices;
+      }catch(_){}
+    }
+  }
+  return [];
+}
 async function getHistoricalOfficeMap(){const c=officeCache.get("__history__");if(c&&Date.now()-c.at<1800000)return c.map;const map=new Map();for(let page=1;page<=8;page++){const d=await callOnline("/envios_completos_v2/9002",{page,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07"});for(const row of Array.isArray(d.data)?d.data:[]){const addr=String(row.direccion_destinatario||"");const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);if(!m)continue;for(const v of officeAddressVariants(addr))map.set(v,m[1]);}if(page>=Number(d.last_page||page))break;}officeCache.set("__history__",{at:Date.now(),map});return map;}
 async function enrichOfficeIds(offices,dane=""){const hist=await getHistoricalOfficeMap();return offices.map(o=>{let id=o.id||"",source=o.source||"aveonline";for(const v of officeAddressVariants(o.address)){const known=KNOWN_OFFICE_IDS[String(dane)+"|"+v];if(known){id=known;source="99envios";break;}if(hist.has(v)){id=hist.get(v);source="99envios";break;}}return {...o,id,source};});}
 async function getHistoricalOfficeOptions(cityName){
@@ -146,7 +175,8 @@ export default async function handler(req,res){
         const cached=officeCache.get(dane);
         if(cached && cached.source==="99envios" && Date.now()-cached.at<1800000) return res.status(200).json({ok:true,source:"99envios",offices:cached.offices});
         let offices=[];
-        try{
+        try{ offices=await get99OfficeCatalog(dane); }catch(_){}
+        if(!offices.length) try{
           const token=await getToken();
           const candidates=[dane,dane.slice(0,5)].filter((v,i,a)=>/^\d{5,8}$/.test(v)&&a.indexOf(v)===i);
           for(const code of candidates){
