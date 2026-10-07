@@ -105,7 +105,7 @@ export default async function handler(req,res){
       }
       if(action==="prueba_preenvio_validacion"){
         const token=await getToken();
-        const payload={IdTipoEntrega:2,IdServicio:3,AplicaContrapago:true,peso:1,largo:10,ancho:10,alto:10,diceContener:"PRUEBA",valorDeclarado:149900,seguro99:false,seguro99plus:true,
+        const testTipo=Number(req.query?.tipo||2),testServicio=Number(req.query?.servicio||3); const payload={IdTipoEntrega:testTipo,IdServicio:testServicio,AplicaContrapago:true,peso:1,largo:10,ancho:10,alto:10,diceContener:"PRUEBA",valorDeclarado:149900,seguro99:false,seguro99plus:true,
           Destinatario:{tipoDocumento:"ZZZ",numeroDocumento:"",nombre:"Juan",primerApellido:"NA",segundoApellido:"",telefono:"3000000000",direccion:"KR 18 CON CL 104",idLocalidad:"05837000",correo:""},
           transportadora:{pais:"colombia",nombre:"interrapidisimo"},origenCreacion:1};
         const rr=await fetch(API_BASE+"/preenvio",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
