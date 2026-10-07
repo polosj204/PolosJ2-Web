@@ -222,7 +222,7 @@ function normalizeQuotes(raw){
 function numericField(obj,names){
  if(!obj||typeof obj!=="object")return null;
  for(const n of names){
-  if(obj[n]!==undefined&&obj[n]!==null&&/^\\d+$/.test(String(obj[n])))return Number(obj[n]);
+  if(obj[n]!==undefined&&obj[n]!==null&&/^[0-9]+$/.test(String(obj[n])))return Number(obj[n]);
  }
  return null;
 }
