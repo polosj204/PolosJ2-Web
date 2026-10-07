@@ -125,6 +125,17 @@ export default async function handler(req,res){
         }
         return res.status(200).json({ok:true,out});
       }
+      if(action==="prueba_preenvio_centro"){
+        const center=String(req.query?.center||"");
+        if(!center) return res.status(400).json({ok:false,error:"Falta center."});
+        const token=await getToken();
+        const payload={IdTipoEntrega:1,IdServicio:1,AplicaContrapago:true,peso:1,largo:10,ancho:10,alto:10,diceContener:"PRUEBA",valorDeclarado:149900,seguro99:false,seguro99plus:true,IdCentroServicio:Number(center),
+          Destinatario:{tipoDocumento:"CC",numeroDocumento:"1013595727",nombre:"Juan",primerApellido:"NA",segundoApellido:"",telefono:"3000000000",direccion:"CL 30 A 65 B 59",idLocalidad:"05001000",correo:""},
+          DescripcionTipoEntrega:"RECLAME EN OFICINA",NombreTipoEnvio:"SOBRE CARTA",CodigoConvenio:0,IdSucursal:0,IdCliente:0,Notificacion:null,RapiRadicado:null,Observaciones:"Pedido PolosJ2",transportadora:{pais:"colombia",nombre:"interrapidisimo"},origenCreacion:1};
+        const rr=await fetch(API_BASE+"/preenvio",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
+        const raw=await rr.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(_){}
+        return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
+      }
       if(action==="muestra_oficina"){
         const rows=[];
         for(let page=1;page<=8;page++){
