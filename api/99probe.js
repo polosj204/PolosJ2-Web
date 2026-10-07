@@ -1,8 +1,9 @@
 export default async function handler(req,res){
   try{
-    const r=await fetch("https://99envios.app/static/js/448.f0843ff2.chunk.js");
-    const js=await r.text();
-    const hits=[]; for(const n of ["codigoSucursal","usuario_id","sucursal","login","api/online"]){let p=0,c=0;while((p=js.indexOf(n,p))>=0&&c<10){hits.push({n,context:js.slice(Math.max(0,p-1800),Math.min(js.length,p+3000))});p+=n.length;c++;}}
-    return res.status(200).json({ok:r.ok,status:r.status,length:js.length,hits});
+    const email=process.env.NINETY_NINE_ENVIOS_EMAIL,password=process.env.NINETY_NINE_ENVIOS_PASSWORD;
+    const r=await fetch("https://api.99envios.app/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({email,password})});
+    const t=await r.text(); let d={}; try{d=JSON.parse(t)}catch(_){}
+    const safe={...d}; if(safe.token) safe.token="[redacted]"; if(safe.user) safe.user={...safe.user};
+    return res.status(200).json({ok:r.ok,status:r.status,keys:Object.keys(d||{}),data:safe});
   }catch(e){return res.status(502).json({ok:false,error:e.message});}
 }
