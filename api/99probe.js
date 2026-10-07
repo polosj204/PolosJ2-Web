@@ -1,10 +1,8 @@
 export default async function handler(req,res){
   try{
-    const r=await fetch("https://99envios.app/static/js/main.1d94ea4f.js");
+    const r=await fetch("https://99envios.app/static/js/runtime.39fb3e06.js");
     const js=await r.text();
-    const pos=[]; const re=/(?:^|[;,])pe=/g;
-    for(const m of js.matchAll(re)) pos.push(m.index);
-    const contexts=pos.slice(0,20).map(p=>js.slice(Math.max(0,p-1000),Math.min(js.length,p+5000)));
-    return res.status(200).json({ok:r.ok,count:pos.length,contexts});
+    const p=js.indexOf("1523");
+    return res.status(200).json({ok:r.ok,length:js.length,context:p>=0?js.slice(Math.max(0,p-1000),p+2000):"not-found"});
   }catch(e){return res.status(502).json({ok:false,error:e.message});}
 }
