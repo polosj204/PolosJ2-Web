@@ -81,6 +81,18 @@ export default async function handler(req,res){
         const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
         return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
       }
+      if(action==="probar_catalogos"){
+        const token=await getToken();
+        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos"];
+        const out={};
+        for(const path of paths){
+          try{
+            const rr=await fetch(API_BASE+path,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+            const raw=await rr.text(); out[path]={status:rr.status,body:raw.slice(0,3000)};
+          }catch(e){out[path]={error:e.message};}
+        }
+        return res.status(200).json({ok:true,out});
+      }
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
