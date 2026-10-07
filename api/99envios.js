@@ -143,7 +143,7 @@ export default async function handler(req,res){
         }
         for(const code of ["27001000","27001","QUIBDÓ","QUIBDO"]){
           try{
-            const rr=await fetch("https://integration1.99envios.app/api/sucursal/oficinas/"+encodeURIComponent(code),{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"}});
+            const rr=await fetch("https://integration1.99envios.app/api/sucursal/oficinas/"+encodeURIComponent(code),{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"},body:JSON.stringify({})});
             const raw=await rr.text(); out["/sucursal/oficinas/"+code]={status:rr.status,body:raw.slice(0,12000)};
           }catch(e){out["/sucursal/oficinas/"+code]={error:e.message};}
         }
