@@ -102,7 +102,7 @@ export default async function handler(req,res){
           if(ave.ok){
             const rows=Array.isArray(data?.data)?data.data:[];
             const offices=rows.map((o,i)=>({
-              id:"ave:"+String(o.id||i+1),
+              id:"ave:"+dane+":"+String(o.id||i+1),
               address:String(o.location||""),
               city:String(o.city||""),
               department:"",
