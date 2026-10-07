@@ -281,6 +281,12 @@ function parseAddress(raw){
  if(/^OFICINA INTERRAPIDÍSIMO/i.test(s))return {direccion:"OFICINA INTERRAPIDÍSIMO",barrio:"",office:true};
  return {barrio:parts[0]||"",direccion:parts.slice(1).join(" · ")||s,office:false};
 }
+function officeCenterId(){
+ const raw=String(currentOrder?.office_center_id||"");
+ if(!raw || raw.startsWith("ave:")) return null;
+ const n=Number(raw);
+ return Number.isFinite(n)&&n>0?n:null;
+}
 
 async function generateShipping(){
  if(!currentOrder||!currentCustomer)return;
@@ -318,6 +324,7 @@ async function generateShipping(){
   msg.textContent="Cotización seleccionada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
     IdTipoEntrega:office?2:1,IdServicio:office?2:1,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+    ...(office?{IdCentroServicio:officeCenterId()}:{}),
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
     Destinatario:{
       tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
