@@ -144,7 +144,7 @@ export default async function handler(req,res){
         const dane=String(req.query?.dane||"").trim();
         if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
         const cached=officeCache.get(dane);
-        if(cached && Date.now()-cached.at<1800000) return res.status(200).json({ok:true,source:"99envios",offices:cached.offices});
+        if(cached && cached.source==="99envios" && Date.now()-cached.at<1800000) return res.status(200).json({ok:true,source:"99envios",offices:cached.offices});
         let offices=[];
         try{
           const token=await getToken();
@@ -167,8 +167,9 @@ export default async function handler(req,res){
         if(!offices.length){
           try{ offices=await enrichOfficeIds(await getAveOffices(dane),dane); }catch(_){ offices=[]; }
         }
-        officeCache.set(dane,{at:Date.now(),offices});
-        return res.status(200).json({ok:true,source:offices.some(x=>x.source==="99envios")?"99envios":offices.length?"aveonline":"99envios",offices});
+        const source=offices.some(x=>x.source==="99envios")?"99envios":offices.length?"aveonline":"99envios";
+        officeCache.set(dane,{at:Date.now(),offices,source});
+        return res.status(200).json({ok:true,source,offices});
       }
       if(action==="resolver_oficina"){
         const dane=String(req.query?.dane||"").trim(),address=String(req.query?.address||"").trim();
