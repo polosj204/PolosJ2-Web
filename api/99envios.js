@@ -108,7 +108,7 @@ export default async function handler(req,res){
     const p={...payload};
     const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Bogota",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());
     const dp={}; for(const x of parts)if(x.type!=="literal")dp[x.type]=x.value;
-    p.fecha=String(Number(dp.day))+"-"+String(Number(dp.month))+"-"+dp.year;
+    p.fecha=String(dp.day).padStart(2,"0")+"-"+String(dp.month).padStart(2,"0")+"-"+dp.year;
     const token=await getToken();
     const r=await fetch(API_BASE+"/"+action,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
     const raw=await r.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
