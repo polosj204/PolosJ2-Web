@@ -102,39 +102,17 @@ export default async function handler(req,res){
         const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
         return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
       }
-      if(action==="prueba_oficina_medellin"){
-        const token=await getToken();
-        const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Bogota",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());
-        const dp={}; for(const x of parts)if(x.type!=="literal")dp[x.type]=x.value;
-        const payload={destino:{nombre:"Medellín",codigo:"05001000"},origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},IdTipoEntrega:2,IdServicio:2,valorDeclarado:149900,peso:1,alto:10,largo:10,ancho:10,fecha:String(dp.day).padStart(2,"0")+"-"+String(dp.month).padStart(2,"0")+"-"+dp.year,seguro99:false,seguro99plus:true,AplicaContrapago:true};
-        const rr=await fetch(API_BASE+"/cotizar",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
-        const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
-        return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
-      }
       if(action==="probar_catalogos"){
         const token=await getToken();
-        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos","/oficinas/05001000","/oficinas/05001","/centros-servicio/05001000","/centros-servicio/05001","/centros/05001000","/ciudades/05001000","/ciudades/05001","/ver-efectividad-ciudades/05001000","/ver-efectividad-ciudades/05001","API:/oficinas/05001000","API:/oficinas/05001","API:/centros-servicio/05001000","API:/centros/05001000","API:/ciudades/05001000","API:/ver-oficinas/05001000","API:/ver-oficinas/05001"];
+        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos"];
         const out={};
         for(const path of paths){
           try{
-            const base=path.startsWith("API:")?"https://integration.99envios.app/api":API_BASE;
-          const pth=path.startsWith("API:")?path.slice(4):path;
-          const rr=await fetch(base+pth,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+            const rr=await fetch(API_BASE+path,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
             const raw=await rr.text(); out[path]={status:rr.status,body:raw.slice(0,3000)};
           }catch(e){out[path]={error:e.message};}
         }
         return res.status(200).json({ok:true,out});
-      }
-      if(action==="prueba_preenvio_centro"){
-        const center=String(req.query?.center||"");
-        if(!center) return res.status(400).json({ok:false,error:"Falta center."});
-        const token=await getToken();
-        const payload={IdTipoEntrega:1,IdServicio:1,AplicaContrapago:true,peso:1,largo:10,ancho:10,alto:10,diceContener:"PRUEBA",valorDeclarado:149900,seguro99:false,seguro99plus:true,IdCentroServicio:Number(center),
-          Destinatario:{tipoDocumento:"CC",numeroDocumento:"1013595727",nombre:"Juan",primerApellido:"NA",segundoApellido:"",telefono:"3000000000",direccion:"CL 30 A 65 B 59",idLocalidad:"05001000",correo:""},
-          DescripcionTipoEntrega:"RECLAME EN OFICINA",NombreTipoEnvio:"SOBRE CARTA",CodigoConvenio:0,IdSucursal:0,IdCliente:0,Notificacion:null,RapiRadicado:null,Observaciones:"Pedido PolosJ2",transportadora:{pais:"colombia",nombre:"interrapidisimo"},origenCreacion:1};
-        const rr=await fetch(API_BASE+"/preenvio",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
-        const raw=await rr.text();let data={};try{data=raw?JSON.parse(raw):{}}catch(_){}
-        return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
       }
       if(action==="muestra_oficina"){
         const rows=[];
@@ -162,12 +140,6 @@ export default async function handler(req,res){
         return res.status(200).json({ok:true,total:rows.length,samples});
       }
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
-      if(action==="oficinas_historicas"){
-        const city=String(req.query?.city||"").trim();
-        if(!city) return res.status(400).json({ok:false,error:"Falta la ciudad."});
-        const offices=await getHistoricalOfficeOptions(city);
-        return res.status(200).json({ok:true,city,offices});
-      }
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
         if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
