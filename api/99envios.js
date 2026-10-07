@@ -30,7 +30,7 @@ function officeAddressVariants(v){const raw=String(v||"");return [raw,raw.replac
 async function getAveOffices(dane){const r=await fetch(AVE_BASE+"/1016/"+encodeURIComponent(dane),{headers:{Accept:"application/json"}});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch(_){}if(!r.ok)return [];const rows=Array.isArray(d?.data)?d.data:[];return rows.map(o=>({id:String(o.id||""),name:String(o.name||"Oficina Interrapidísimo"),address:String(o.location||""),city:String(o.city||"")})).filter(x=>x.address||x.name);}
 async function get99OfficeCatalog(dane){
   const token=await getToken();
-  const codes=[String(dane||"").trim(),String(dane||"").trim().slice(0,5)].filter((v,i,a)=>/^\\d{5,8}$/.test(v)&&a.indexOf(v)===i);
+  const codes=[String(dane||"").trim(),String(dane||"").trim().slice(0,5)].filter((v,i,a)=>/^\d{5,8}$/.test(v)&&a.indexOf(v)===i);
   const bases=["https://integration1.99envios.app/api/sucursal/oficinas/","https://integration.99envios.app/api/sucursal/oficinas/"];
   for(const base of bases){
     for(const code of codes){
@@ -50,7 +50,7 @@ async function get99OfficeCatalog(dane){
           const name=c.Nombre??c.nombre??c.NombreSucursal??c.nombre_sucursal??c.name??"Oficina Interrapidísimo";
           const department=c.Departamento??c.departamento??c.department??"";
           return {id:String(id||""),address:String(address||""),city:String(city||""),department:String(department||""),name:String(name||"Oficina Interrapidísimo"),source:"99envios"};
-        }).filter(x=>/^\\d+$/.test(x.id)&&x.address);
+        }).filter(x=>/^\d+$/.test(x.id)&&x.address);
         if(offices.length) return offices;
       }catch(_){}
     }
