@@ -113,7 +113,7 @@ export default async function handler(req,res){
       }
       if(action==="probar_catalogos"){
         const token=await getToken();
-        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos"];
+        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos","/oficinas/05001000","/oficinas/05001","/centros-servicio/05001000","/centros-servicio/05001","/centros/05001000","/ciudades/05001000","/ciudades/05001","/ver-efectividad-ciudades/05001000","/ver-efectividad-ciudades/05001"];
         const out={};
         for(const path of paths){
           try{
