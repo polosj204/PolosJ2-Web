@@ -141,6 +141,12 @@ export default async function handler(req,res){
             const raw=await rr.text(); out[path]={status:rr.status,body:raw.slice(0,3000)};
           }catch(e){out[path]={error:e.message};}
         }
+        for(const code of ["27001000","27001","QUIBDÓ","QUIBDO"]){
+          try{
+            const rr=await fetch("https://integration1.99envios.app/api/sucursal/oficinas/"+encodeURIComponent(code),{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"}});
+            const raw=await rr.text(); out["/sucursal/oficinas/"+code]={status:rr.status,body:raw.slice(0,12000)};
+          }catch(e){out["/sucursal/oficinas/"+code]={error:e.message};}
+        }
         return res.status(200).json({ok:true,out});
       }
       if(action==="muestra_oficina"){
