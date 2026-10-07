@@ -30,6 +30,27 @@ function officeAddressVariants(v){const raw=String(v||"");return [raw,raw.replac
 async function getAveOffices(dane){const r=await fetch(AVE_BASE+"/1016/"+encodeURIComponent(dane),{headers:{Accept:"application/json"}});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch(_){}if(!r.ok)return [];const rows=Array.isArray(d?.data)?d.data:[];return rows.map(o=>({id:String(o.id||""),name:String(o.name||"Oficina Interrapidísimo"),address:String(o.location||""),city:String(o.city||"")})).filter(x=>x.address||x.name);}
 async function getHistoricalOfficeMap(){const c=officeCache.get("__history__");if(c&&Date.now()-c.at<1800000)return c.map;const map=new Map();for(let page=1;page<=8;page++){const d=await callOnline("/envios_completos_v2/9002",{page,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07"});for(const row of Array.isArray(d.data)?d.data:[]){const addr=String(row.direccion_destinatario||"");const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);if(!m)continue;for(const v of officeAddressVariants(addr))map.set(v,m[1]);}if(page>=Number(d.last_page||page))break;}officeCache.set("__history__",{at:Date.now(),map});return map;}
 async function enrichOfficeIds(offices,dane=""){const hist=await getHistoricalOfficeMap();return offices.map(o=>{let id=o.id||"",source=o.source||"aveonline";for(const v of officeAddressVariants(o.address)){const known=KNOWN_OFFICE_IDS[String(dane)+"|"+v];if(known){id=known;source="99envios";break;}if(hist.has(v)){id=hist.get(v);source="99envios";break;}}return {...o,id,source};});}
+async function getHistoricalOfficeOptions(cityName){
+  const wanted=normOffice(cityName);
+  const rows=[];
+  for(let page=1;page<=8;page++){
+    const d=await callOnline("/envios_completos_v2/9002",{page,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07"});
+    if(Array.isArray(d.data)) rows.push(...d.data);
+    if(page>=Number(d.last_page||page)) break;
+  }
+  const seen=new Map();
+  for(const row of rows){
+    const city=String(row.ciudad_destino||"").split(/[\\/]/)[0].trim();
+    const addr=String(row.direccion_destinatario||"");
+    const m=addr.toUpperCase().match(/\\(OFC:\\s*([0-9]+)\\)/);
+    if(!m || normOffice(city)!==wanted) continue;
+    const address=addr.replace(/\\s*\\(OFC:\\s*[0-9]+\\)\\s*/i,"").trim();
+    const id=String(m[1]);
+    const key=id+"|"+normOffice(address);
+    if(!seen.has(key)) seen.set(key,{id,address,city,source:"99envios",name:"Oficina Interrapidísimo"});
+  }
+  return [...seen.values()];
+}
 async function callOnline(path,query={}){
   const token=await getToken();
   const u=new URL(HISTORY_BASE+path);
@@ -130,9 +151,18 @@ export default async function handler(req,res){
           const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://app.99envios.app",Referer:"https://app.99envios.app/"}});const raw=await rr.text();let data=[];try{data=raw?JSON.parse(raw):[]}catch(_){}
           if(rr.ok&&Array.isArray(data)) offices=data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||""),source:"99envios"}}).filter(x=>x.id&&x.address);
         }catch(_){}
-        if(!offices.length) offices=await enrichOfficeIds(await getAveOffices(dane),dane);
+        if(!offices.length){
+          try{
+            const d=dane.slice(0,5);
+            const cityName=(d==="05001"?"MEDELLÍN":"");
+            if(cityName) offices=await getHistoricalOfficeOptions(cityName);
+          }catch(_){}
+        }
+        if(!offices.length){
+          try{ offices=await enrichOfficeIds(await getAveOffices(dane),dane); }catch(_){ offices=[]; }
+        }
         officeCache.set(dane,{at:Date.now(),offices});
-        return res.status(200).json({ok:true,source:offices.some(x=>x.source==="99envios")?"99envios":"aveonline",offices});
+        return res.status(200).json({ok:true,source:offices.some(x=>x.source==="99envios")?"99envios":offices.length?"aveonline":"99envios",offices});
       }
       if(action==="resolver_oficina"){
         const dane=String(req.query?.dane||"").trim(),address=String(req.query?.address||"").trim();
