@@ -40,7 +40,7 @@ async function getHistoricalOfficeOptions(cityName){
   }
   const seen=new Map();
   for(const row of rows){
-    const city=String(row.ciudad_destino||"").split(/[\\/]/)[0].trim();
+    const city=String(row.ciudad_destino||"").split(/[\\/,|]/)[0].trim();
     const addr=String(row.direccion_destinatario||"");
     const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);
     if(!m || normOffice(city)!==wanted) continue;
