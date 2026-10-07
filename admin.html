@@ -227,12 +227,22 @@ function numericField(obj,names){
  return null;
 }
 function resolveQuoteIds(chosen,root,office){
- const tipo=numericField(chosen,["IdTipoEntrega","idTipoEntrega","id_tipo_entrega","tipoEntrega","tipo_entrega"]) ??
-            numericField(root,["IdTipoEntrega","idTipoEntrega","id_tipo_entrega"]);
- const servicio=numericField(chosen,["IdServicio","idServicio","id_servicio","servicioId","idServicioEntrega","id_servicio_entrega"]);
+ const carrier=String(chosen?.carrierKey||chosen?.carrierName||"").toLowerCase();
+ const serviceByCarrier={
+   interrapidisimo:1,
+   tcc:2,
+   servientrega:3,
+   coordinadora:4,
+   envia:5
+ };
+ // 99 Envíos usa su propio IdServicio para el preenvío; no debemos enviar
+ // el IdServicio de la cotización interna de la transportadora (p.ej. Inter 3).
+ const servicio=serviceByCarrier[carrier] ?? null;
+ // El endpoint /preenvio de 99 Envíos valida actualmente IdTipoEntrega=1.
+ // Para reclamo en oficina, la oficina se determina con IdCentroServicio.
  return {
-   IdTipoEntrega:Number.isFinite(tipo)?tipo:(office?2:1),
-   IdServicio:Number.isFinite(servicio)?servicio:null
+   IdTipoEntrega:1,
+   IdServicio:servicio
  };
 }
 function quoteValue(q){
