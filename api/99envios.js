@@ -35,7 +35,7 @@ async function get99OfficeCatalog(dane){
   for(const base of bases){
     for(const code of codes){
       try{
-        const rr=await fetch(base+encodeURIComponent(code),{headers:{Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"}});
+        const rr=await fetch(base+encodeURIComponent(code),{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"},body:JSON.stringify({})});
         const raw=await rr.text(); let data=null; try{data=raw?JSON.parse(raw):null}catch(_){}
         if(!rr.ok||data==null) continue;
         const candidates=[]; const add=v=>{if(Array.isArray(v)) candidates.push(v);};
@@ -140,12 +140,6 @@ export default async function handler(req,res){
             const rr=await fetch(API_BASE+path,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
             const raw=await rr.text(); out[path]={status:rr.status,body:raw.slice(0,3000)};
           }catch(e){out[path]={error:e.message};}
-        }
-        for(const code of ["27001000","27001","QUIBDÓ","QUIBDO"]){
-          try{
-            const rr=await fetch("https://integration1.99envios.app/api/sucursal/oficinas/"+encodeURIComponent(code),{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,Accept:"application/json",Origin:"https://99envios.app",Referer:"https://99envios.app/"},body:JSON.stringify({})});
-            const raw=await rr.text(); out["/sucursal/oficinas/"+code]={status:rr.status,body:raw.slice(0,12000)};
-          }catch(e){out["/sucursal/oficinas/"+code]={error:e.message};}
         }
         return res.status(200).json({ok:true,out});
       }
