@@ -64,12 +64,56 @@ export default async function handler(req,res){
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
         if(!/^\d{8}$/.test(dane)) return res.status(400).json({ok:false,error:"DANE inválido."});
-        const token=await getToken();
-        const r=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
-        const raw=await r.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
-        if(!r.ok) return res.status(r.status||502).json({ok:false,error:"99 Envíos no pudo consultar las oficinas.",details:data});
-        const offices=Array.isArray(data)?data.map(x=>{const c=x?.CentroServicio||{};return{id:String(c.IdCentroServicio||""),address:String(c.Direccion||""),city:String(c.Ciudad||""),department:String(c.Departamento||"")}}).filter(x=>x.id&&x.address):[];
-        return res.status(200).json({ok:true,offices});
+
+        // Fuente primaria: endpoint que 99 Envíos utiliza para consultar sus sucursales.
+        try{
+          const token=await getToken();
+          const rr=await fetch("https://integration.99envios.app/api/ver-efectividad-ciudades/"+dane,{
+            headers:{
+              Authorization:"Bearer "+token,
+              Accept:"application/json",
+              Origin:"https://app.99envios.app",
+              Referer:"https://app.99envios.app/"
+            }
+          });
+          const raw=await rr.text(); let data=[]; try{data=raw?JSON.parse(raw):[]}catch(_){}
+          if(rr.ok && Array.isArray(data)){
+            const offices=data.map(x=>{
+              const c=x?.CentroServicio||{};
+              return {
+                id:String(c.IdCentroServicio||""),
+                address:String(c.Direccion||""),
+                city:String(c.Ciudad||""),
+                department:String(c.Departamento||""),
+                source:"99envios"
+              };
+            }).filter(x=>x.id&&x.address);
+            if(offices.length) return res.status(200).json({ok:true,source:"99envios",offices});
+          }
+        }catch(_){}
+
+        // Respaldo: oficinas activas de Interrapidísimo. Su ID NO se trata como
+        // IdCentroServicio de 99 Envíos; queda marcado para no generar guías incorrectas.
+        try{
+          const ave=await fetch("https://api.aveonline.co/api-oficinas/public/api/v1/offices/1016/"+encodeURIComponent(dane),{
+            headers:{Accept:"application/json"}
+          });
+          const raw=await ave.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
+          if(ave.ok){
+            const rows=Array.isArray(data?.data)?data.data:[];
+            const offices=rows.map((o,i)=>({
+              id:"ave:"+String(o.id||i+1),
+              address:String(o.location||""),
+              city:String(o.city||""),
+              department:"",
+              name:String(o.name||"Interrapidísimo"),
+              source:"aveonline"
+            })).filter(x=>x.address||x.name);
+            if(offices.length) return res.status(200).json({ok:true,source:"aveonline",offices});
+          }
+        }catch(_){}
+
+        return res.status(200).json({ok:true,source:"none",offices:[]});
       }
       return res.status(200).json({ok:true,configured:true});
     }catch(e){return res.status(e.status||502).json({ok:false,error:e.message||"Error 99 Envíos."});}
