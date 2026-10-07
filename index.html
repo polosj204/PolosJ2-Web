@@ -174,8 +174,15 @@ async function loadOfficeOptions(){
   const d=await r.json();
   if(!r.ok||!d.ok) throw new Error(d.error||'No se pudieron consultar las oficinas.');
   officeOptions=Array.isArray(d.offices)?d.offices:[];
-  if(!officeOptions.length){select.innerHTML='<option value="">No hay oficinas disponibles</option>';help.textContent='99 Envíos no reporta oficinas disponibles para este municipio.';return}
-  select.innerHTML='<option value="">Selecciona una oficina</option>'+officeOptions.map(o=>'<option value="'+o.id+'">'+o.address.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>').join('');
+  if(!officeOptions.length){
+    select.innerHTML='<option value="">No hay oficinas disponibles</option>';
+    help.textContent='No encontramos oficinas activas para este municipio.';
+    return;
+  }
+  select.innerHTML='<option value="">Selecciona una oficina</option>'+officeOptions.map(o=>{
+    const label=[o.address,o.name&&o.name!==o.address?o.name:''].filter(Boolean).join(' · ');
+    return '<option value="'+String(o.id||'').replace(/"/g,'&quot;')+'">'+label.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>';
+  }).join('');
   select.disabled=false;
   help.textContent='✓ '+officeOptions.length+' oficina(s) disponible(s) para este municipio'+(d.source==='99envios'?' según 99 Envíos.':'.');
  }catch(e){
