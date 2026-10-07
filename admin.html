@@ -202,7 +202,8 @@ async function openShipping(id){
 function closeShipping(){document.getElementById("shippingModal").classList.remove("open");currentOrder=null;currentCustomer=null}
 
 function cleanName(name){
- const parts=String(name||"Cliente").trim().split(/\s+/);return {nombre:parts.shift()||"Cliente",primerApellido:parts.shift()||"",segundoApellido:parts.join(" ")||""};
+ const parts=String(name||"Cliente").trim().split(/\s+/).filter(Boolean);
+ return {nombre:parts.shift()||"Cliente",primerApellido:parts.shift()||"NA",segundoApellido:parts.join(" ")||""};
 }
 function dateDMY(){const d=new Date();return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear()}
 function normalizeQuotes(raw){
@@ -217,6 +218,22 @@ function normalizeQuotes(raw){
   }
  }
  return list;
+}
+function numericField(obj,names){
+ if(!obj||typeof obj!=="object")return null;
+ for(const n of names){
+  if(obj[n]!==undefined&&obj[n]!==null&&/^\\d+$/.test(String(obj[n])))return Number(obj[n]);
+ }
+ return null;
+}
+function resolveQuoteIds(chosen,root,office){
+ const tipo=numericField(chosen,["IdTipoEntrega","idTipoEntrega","id_tipo_entrega","tipoEntrega","tipo_entrega"]) ??
+            numericField(root,["IdTipoEntrega","idTipoEntrega","id_tipo_entrega"]);
+ const servicio=numericField(chosen,["IdServicio","idServicio","id_servicio","servicioId","idServicioEntrega","id_servicio_entrega"]);
+ return {
+   IdTipoEntrega:Number.isFinite(tipo)?tipo:(office?2:1),
+   IdServicio:Number.isFinite(servicio)?servicio:null
+ };
 }
 function quoteValue(q){
  return Number(q.valor_contrapago||q.valor||0)+Number(q.comision_interna||q.valor_interna||0)+Number(q.sobreflete||0)+Number(q.seguro99||0)+Number(q.seguro99plus||0);
@@ -333,9 +350,11 @@ async function generateShipping(){
   const qj=await qr.json();if(!qr.ok||!qj.ok){const detail=qj.details?.errors?Object.entries(qj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((qj.error||"No se pudo cotizar.")+(detail?" · "+detail:""));}
   const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
   const chosen=chooseCarrier(quotes),shippingCost=quoteValue(chosen);
+  const quoteIds=resolveQuoteIds(chosen,qj.data,office);
+  if(quoteIds.IdServicio===null){throw Error("99 Envíos no devolvió un IdServicio válido en la cotización. No generaremos el preenvío para evitar un rechazo.");}
   msg.textContent="Cotización seleccionada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
-    IdTipoEntrega:office?2:1,IdServicio:office?2:1,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+    IdTipoEntrega:quoteIds.IdTipoEntrega,IdServicio:quoteIds.IdServicio,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
     ...(office?{IdCentroServicio:centerId}:{}),
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
     Destinatario:{
