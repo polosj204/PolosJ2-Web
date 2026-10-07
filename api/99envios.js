@@ -42,7 +42,7 @@ async function getHistoricalOfficeOptions(cityName){
   for(const row of rows){
     const city=String(row.ciudad_destino||"").split(/[\\/]/)[0].trim();
     const addr=String(row.direccion_destinatario||"");
-    const m=addr.toUpperCase().match(/\\(OFC:\\s*([0-9]+)\\)/);
+    const m=addr.toUpperCase().match(/\(OFC:\s*([0-9]+)\)/);
     if(!m || normOffice(city)!==wanted) continue;
     const address=addr.replace(/\\s*\\(OFC:\\s*[0-9]+\\)\\s*/i,"").trim();
     const id=String(m[1]);
@@ -160,8 +160,7 @@ export default async function handler(req,res){
         }catch(_){}
         if(!offices.length){
           try{
-            const d=dane.slice(0,5);
-            const cityName=(d==="05001"?"MEDELLÍN":"");
+            const cityName=String(req.query?.city||"").trim();
             if(cityName) offices=await getHistoricalOfficeOptions(cityName);
           }catch(_){}
         }

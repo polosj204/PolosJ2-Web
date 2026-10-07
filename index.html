@@ -170,7 +170,8 @@ async function loadOfficeOptions(){
  if(cityMatches.length!==1){select.innerHTML='<option value="">Primero verifica municipio y departamento</option>';help.textContent='No podemos consultar oficinas hasta identificar el destino.';return}
  try{
   const dane=cityMatches[0].dane;
-  const r=await fetch('/api/99envios?action=oficinas&dane='+encodeURIComponent(dane));
+  const city=cityMatches[0].city;
+  const r=await fetch('/api/99envios?action=oficinas&dane='+encodeURIComponent(dane)+'&city='+encodeURIComponent(city));
   const d=await r.json();
   if(!r.ok||!d.ok) throw new Error(d.error||'No se pudieron consultar las oficinas.');
   // Solo permitimos oficinas cuyo ID sea un IdCentroServicio real de 99 Envíos.
@@ -188,7 +189,7 @@ async function loadOfficeOptions(){
     return '<option value="'+String(o.id||'').replace(/"/g,'&quot;')+'">'+label.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>';
   }).join('');
   select.disabled=false;
-  help.textContent='✓ '+officeOptions.length+' oficina(s) disponible(s) para este municipio según 99 Envíos.';
+  help.textContent='✓ '+officeOptions.length+' oficina(s) confirmada(s) para este municipio según 99 Envíos.';
  }catch(e){
   select.innerHTML='<option value="">No se pudieron consultar</option>';help.textContent=e.message||'No se pudieron consultar las oficinas.';
  }
