@@ -354,13 +354,17 @@ async function generateShipping(){
   if(quoteIds.IdServicio===null){throw Error("99 Envíos no devolvió un IdServicio válido en la cotización. No generaremos el preenvío para evitar un rechazo.");}
   msg.textContent="Cotización seleccionada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
   const prePayload={
-    IdTipoEntrega:quoteIds.IdTipoEntrega,IdServicio:quoteIds.IdServicio,AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
-    ...(office?{IdCentroServicio:centerId}:{}),
+    IdTipoEntrega:String(quoteIds.IdTipoEntrega),IdServicio:Number(quoteIds.IdServicio),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+    ...(office?{IdCentroServicio:Number(centerId)||0}:{}),
     diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
+    IdTipoEnvio:1,IdFormaPago:2,NumeroPieza:1,
     Destinatario:{
       tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
-      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idLocalidad:code,correo:currentCustomer.email||""
+      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idDestinatario:0,idRemitente:0,idLocalidad:code,
+      CodigoConvenio:0,ConvenioDestinatario:0,correo:currentCustomer.email||""
     },
+    DescripcionTipoEntrega:office?"RECLAME EN OFICINA":"",
+    NombreTipoEnvio:"SOBRE CARTA",CodigoConvenio:0,IdSucursal:0,IdCliente:0,Notificacion:null,RapiRadicado:null,
     Observaciones:"Pedido PolosJ2",
     transportadora:{pais:"colombia",nombre:chosen.carrierName},
     origenCreacion:1
