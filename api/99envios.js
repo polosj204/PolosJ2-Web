@@ -103,6 +103,15 @@ export default async function handler(req,res){
         const officeRows=rows.filter(x=>/OFICINA INTERRAPID|\\(OFC:/i.test(String(x.direccion_destinatario||"")));
         return res.status(200).json({ok:true,count:officeRows.length,samples:officeRows.slice(0,20).map(x=>{const out={};for(const [k,v] of Object.entries(x)){if(/tipo|servicio|centro|sucursal|transport|oficina|entrega/i.test(k))out[k]=v;}return out;})});
       }
+      if(action==="prueba_preenvio_validacion"){
+        const token=await getToken();
+        const payload={IdTipoEntrega:2,IdServicio:3,AplicaContrapago:true,peso:1,largo:10,ancho:10,alto:10,diceContener:"PRUEBA",valorDeclarado:149900,seguro99:false,seguro99plus:true,
+          Destinatario:{tipoDocumento:"ZZZ",numeroDocumento:"",nombre:"Juan",primerApellido:"NA",segundoApellido:"",telefono:"3000000000",direccion:"KR 18 CON CL 104",idLocalidad:"05837000",correo:""},
+          transportadora:{pais:"colombia",nombre:"interrapidisimo"},origenCreacion:1};
+        const rr=await fetch(API_BASE+"/preenvio",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
+        const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
+        return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
+      }
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
