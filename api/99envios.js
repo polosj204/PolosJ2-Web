@@ -113,11 +113,13 @@ export default async function handler(req,res){
       }
       if(action==="probar_catalogos"){
         const token=await getToken();
-        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos","/oficinas/05001000","/oficinas/05001","/centros-servicio/05001000","/centros-servicio/05001","/centros/05001000","/ciudades/05001000","/ciudades/05001","/ver-efectividad-ciudades/05001000","/ver-efectividad-ciudades/05001"];
+        const paths=["/servicios","/tipos-servicio","/tipos-entrega","/tipo-entrega","/servicios-entrega","/configuracion","/catalogos","/oficinas/05001000","/oficinas/05001","/centros-servicio/05001000","/centros-servicio/05001","/centros/05001000","/ciudades/05001000","/ciudades/05001","/ver-efectividad-ciudades/05001000","/ver-efectividad-ciudades/05001","API:/oficinas/05001000","API:/oficinas/05001","API:/centros-servicio/05001000","API:/centros/05001000","API:/ciudades/05001000","API:/ver-oficinas/05001000","API:/ver-oficinas/05001"];
         const out={};
         for(const path of paths){
           try{
-            const rr=await fetch(API_BASE+path,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+            const base=path.startsWith("API:")?"https://integration.99envios.app/api":API_BASE;
+          const pth=path.startsWith("API:")?path.slice(4):path;
+          const rr=await fetch(base+pth,{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
             const raw=await rr.text(); out[path]={status:rr.status,body:raw.slice(0,3000)};
           }catch(e){out[path]={error:e.message};}
         }
