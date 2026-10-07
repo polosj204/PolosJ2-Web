@@ -44,7 +44,10 @@ export default async function handler(req,res){
 
   try{
     const rows=await getRows();
-    const cn=norm(city);
+    const cityAliases={
+      "CALI":"SANTIAGO DE CALI"
+    };
+    const cn=cityAliases[norm(city)]||norm(city);
     const dn=norm(department);
 
     const matches=rows
