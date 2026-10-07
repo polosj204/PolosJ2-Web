@@ -112,6 +112,12 @@ export default async function handler(req,res){
         const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
         return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
       }
+      if(action==="muestra_turbo"){
+        const d=await callOnline("/envios_completos_v2/9002",{page:1,per_page:100,fecha_desde:"2025-01-01",fecha_hasta:"2026-10-07",ciudad_destino:"Turbo"});
+        const rows=Array.isArray(d.data)?d.data:[];
+        const samples=rows.filter(x=>/Turbo/i.test(String(x.ciudad_destino||""))&&/OFICINA INTERRAPID|\\(OFC:/i.test(String(x.direccion_destinatario||""))).slice(0,20).map(x=>{const out={};for(const [k,v] of Object.entries(x)){if(/tipo|servicio|centro|sucursal|transport|oficina|entrega|guia|preenvio/i.test(k))out[k]=v;}return out;});
+        return res.status(200).json({ok:true,total:rows.length,samples});
+      }
       if(action==="historial") return res.status(200).json({ok:true,data:await getHistory()});
       if(action==="oficinas"){
         const dane=String(req.query?.dane||"").trim();
