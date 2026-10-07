@@ -291,6 +291,18 @@ async function generateShipping(){
  const addr=parseAddress((isOfficeOrder()&&currentOrder.office_address)?currentOrder.office_address:(currentCustomer.address||currentOrder.address)), name=cleanName(currentCustomer.name), contra=String(currentOrder.payment_method||currentOrder.payment||"").toLowerCase().includes("contra");
  const office=isOfficeOrder();
  const insurance99=!office, insurance99plus=office;
+ if(office && String(currentOrder.office_center_id||"").startsWith("ave:")){
+   msg.className="msg bad";
+   msg.textContent="Este pedido tiene una oficina seleccionada desde la base de respaldo, pero 99 Envíos no entregó su IdCentroServicio. No generaremos una guía de oficina con un ID incorrecto.";
+   btn.disabled=false;
+   return;
+ }
+ if(office && !currentOrder.office_center_id){
+   msg.className="msg bad";
+   msg.textContent="Este pedido de oficina no tiene un IdCentroServicio válido de 99 Envíos. No generaremos el envío.";
+   btn.disabled=false;
+   return;
+ }
  if(!addr.direccion && !addr.office){msg.className="msg bad";msg.textContent="El pedido no tiene una dirección de entrega registrada. Revisa la dirección del pedido antes de generar el envío.";btn.disabled=false;return}
  const quotePayload={
   destino:{nombre:city,codigo:code},
