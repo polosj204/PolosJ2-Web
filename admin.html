@@ -15,8 +15,11 @@ table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px so
 
 <div id="app" class="hide">
   <div class="box"><button onclick="load()">Actualizar</button> <button onclick="location.reload()">Cerrar sesión</button></div>
-  <div class="box"><h2>Pedidos</h2><div id="orders">Cargando...</div></div>
-  <div class="box"><h2>Códigos de segunda compra</h2><div id="codes">Cargando...</div></div>
+  <div class="box"><h2>Resumen del negocio</h2><div id="stats" class="grid"><p class="muted">Cargando estadísticas...</p></div></div>
+  <div class="box"><h2>Pedidos</h2><div class="grid"><div class="field"><label>Buscar pedido, cliente, teléfono o guía</label><input id="orderSearch" placeholder="Escribe para buscar..." oninput="renderOrders()"></div><div class="field"><label>Filtrar por estado</label><select id="orderStatus" onchange="renderOrders()"><option value="">Todos los estados</option><option value="pending">Pendiente</option><option value="paid">Pagado</option><option value="processing">En preparación</option><option value="shipped">Enviado</option><option value="delivered">Entregado</option><option value="cancelled">Cancelado</option><option value="returned">Devuelto</option></select></div></div><div id="orders">Cargando...</div></div>
+  <div class="box"><h2>Clientes</h2><div class="field"><label>Buscar cliente</label><input id="customerSearch" placeholder="Nombre, teléfono o ciudad" oninput="renderCustomers()"></div><div id="customers">Cargando...</div></div>
+  <div class="box"><h2>Guías y envíos</h2><p class="muted">Consulta los envíos asociados a pedidos. La anulación requiere confirmar un endpoint autorizado de 99 Envíos; este panel no cancelará guías automáticamente.</p><div class="field"><label>Buscar guía, transportadora o destinatario</label><input id="guideSearch" placeholder="Número de guía, cliente o transportadora" oninput="renderGuides()"></div><div id="guides">Cargando...</div></div>
+  <div class="box"><h2>Códigos de segunda compra</h2><div class="field"><label>Buscar código</label><input id="codeSearch" placeholder="Código o cliente" oninput="renderCodes()"></div><div id="codes">Cargando...</div></div>
 </div>
 
 <div class="modal-bg" id="shippingModal">
