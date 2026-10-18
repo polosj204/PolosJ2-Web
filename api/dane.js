@@ -44,14 +44,26 @@ export default async function handler(req,res){
 
   try{
     const rows=await getRows();
+    // Aceptar variantes comunes de nombres escritos en formularios.
+    // La comparación ignora tildes, mayúsculas, puntos, comas y espacios repetidos.
+    const compact=v=>norm(v).replace(/[^A-Z0-9]/g,"");
     const cityAliases={
-      "CALI":"SANTIAGO DE CALI"
+      "CALI":["SANTIAGO DE CALI","CALI"],
+      "BOGOTA":["BOGOTA","BOGOTA DC","BOGOTA D C","BOGOTA DISTRITO CAPITAL"],
+      "BOGOTA DC":["BOGOTA","BOGOTA DC","BOGOTA D C","BOGOTA DISTRITO CAPITAL"],
+      "BOGOTA D.C.":["BOGOTA","BOGOTA DC","BOGOTA D C","BOGOTA DISTRITO CAPITAL"],
+      "BOGOTÁ D.C.":["BOGOTA","BOGOTA DC","BOGOTA D C","BOGOTA DISTRITO CAPITAL"]
     };
-    const cn=cityAliases[norm(city)]||norm(city);
-    const dn=norm(department);
+    const rawCity=norm(city);
+    const cityKeys=cityAliases[rawCity]||[rawCity];
+    const cityNames=new Set(cityKeys.map(compact));
+    const dn=compact(department);
+    const departmentAliases=new Set(["BOGOTADC","BOGOTADC","BOGOTADISTRITOCAPITAL"]);
+    const isBogotaDepartment=departmentAliases.has(dn);
 
     const matches=rows
-      .filter(x=>norm(x.nom_mpio)===cn && (!dn||norm(x.dpto)===dn))
+      .filter(x=>cityNames.has(compact(x.nom_mpio)) &&
+        (!dn || compact(x.dpto)===dn || (isBogotaDepartment && ["BOGOTA","BOGOTADC","BOGOTADISTRITOCAPITAL"].includes(compact(x.dpto)))))
       .map(x=>({
         city:x.nom_mpio,
         department:x.dpto,
