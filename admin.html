@@ -349,28 +349,44 @@ async function generateShipping(){
   const qr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cotizar",payload:quotePayload})});
   const qj=await qr.json();if(!qr.ok||!qj.ok){const detail=qj.details?.errors?Object.entries(qj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((qj.error||"No se pudo cotizar.")+(detail?" · "+detail:""));}
   const quotes=normalizeQuotes(qj.data);if(!quotes.length)throw Error("99 Envíos no devolvió cotizaciones válidas.");
-  const chosen=chooseCarrier(quotes),shippingCost=quoteValue(chosen);
-  const quoteIds=resolveQuoteIds(chosen,qj.data,office);
-  if(quoteIds.IdServicio===null){throw Error("99 Envíos no devolvió un IdServicio válido en la cotización. No generaremos el preenvío para evitar un rechazo.");}
-  msg.textContent="Cotización seleccionada: "+money(shippingCost)+" · "+(chosen.carrierName||"transportadora")+". Generando preenvío...";
-  const prePayload={
-    IdTipoEntrega:String(quoteIds.IdTipoEntrega),IdServicio:Number(quoteIds.IdServicio),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
-    ...(office?{IdCentroServicio:Number(centerId)||0}:{}),
-    diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
-    IdTipoEnvio:1,IdFormaPago:2,NumeroPieza:1,
-    Destinatario:{
-      tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
-      telefono:String(currentCustomer.phone||"").replace(/\D/g,""),direccion:addr.direccion,idDestinatario:0,idRemitente:0,idLocalidad:code,
-      CodigoConvenio:0,ConvenioDestinatario:0,correo:currentCustomer.email||""
-    },
-    DescripcionTipoEntrega:office?"RECLAME EN OFICINA":"",
-    NombreTipoEnvio:"SOBRE CARTA",CodigoConvenio:0,IdSucursal:0,IdCliente:0,Notificacion:null,RapiRadicado:null,
-    Observaciones:"Pedido PolosJ2",
-    transportadora:{pais:"colombia",nombre:chosen.carrierName},
-    origenCreacion:1
-  };
-  const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
-  const pj=await pr.json();if(!pr.ok||!pj.ok){const detail=pj.details?.errors?Object.entries(pj.details.errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | "):"";throw Error((pj.error||"99 Envíos rechazó el preenvío.")+(detail?" · "+detail:""));}
+  const preferred=chooseCarrier(quotes);
+  const candidates=[preferred,...quotes.slice().sort((a,b)=>quoteValue(a)-quoteValue(b))].filter((q,i,arr)=>arr.findIndex(x=>x.carrierKey===q.carrierKey)===i);
+  let chosen=null,shippingCost=0,quoteIds=null,pj=null,lastServiceError="";
+  for(let attempt=0;attempt<candidates.length;attempt++){
+    chosen=candidates[attempt];
+    quoteIds=resolveQuoteIds(chosen,qj.data,office);
+    if(quoteIds.IdServicio===null) continue;
+    shippingCost=quoteValue(chosen);
+    msg.textContent="Intentando generar preenvío con "+(chosen.carrierName||"transportadora")+" · servicio "+quoteIds.IdServicio+"...";
+    const prePayload={
+      IdTipoEntrega:String(quoteIds.IdTipoEntrega),IdServicio:Number(quoteIds.IdServicio),AplicaContrapago:contra,peso:weight,largo:10,ancho:10,alto:10,
+      ...(office?{IdCentroServicio:Number(centerId)||0}:{}),
+      diceContener:"Combo(s) PolosJ2",valorDeclarado:Number(currentOrder.total)||0,seguro99:insurance99,seguro99plus:insurance99plus,
+      IdTipoEnvio:1,IdFormaPago:2,NumeroPieza:1,
+      Destinatario:{
+        tipoDocumento:"CC",...(cedula?{numeroDocumento:cedula}:{}),nombre:name.nombre,primerApellido:name.primerApellido,segundoApellido:name.segundoApellido,
+        telefono:String(currentCustomer.phone||"").replace(/\\D/g,""),direccion:addr.direccion,idDestinatario:0,idRemitente:0,idLocalidad:code,
+        CodigoConvenio:0,ConvenioDestinatario:0,correo:currentCustomer.email||""
+      },
+      DescripcionTipoEntrega:office?"RECLAME EN OFICINA":"",
+      NombreTipoEnvio:"SOBRE CARTA",CodigoConvenio:0,IdSucursal:0,IdCliente:0,Notificacion:null,RapiRadicado:null,
+      Observaciones:"Pedido PolosJ2",
+      transportadora:{pais:"colombia",nombre:chosen.carrierName},
+      origenCreacion:1
+    };
+    const pr=await fetch(API99,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"preenvio",payload:prePayload})});
+    pj=await pr.json();
+    if(pr.ok&&pj.ok) break;
+    const errors=pj.details?.errors||{};
+    const detail=Object.entries(errors).map(([k,v])=>k+": "+(Array.isArray(v)?v.join(", "):v)).join(" | ");
+    const invalidService=Object.entries(errors).some(([k,v])=>/IdServicio/i.test(k+" "+(Array.isArray(v)?v.join(" "):String(v)))&&/invalid|inválid|selected/i.test(Array.isArray(v)?v.join(" "):String(v)));
+    if(invalidService&&attempt<candidates.length-1){
+      lastServiceError=(pj.error||"99 Envíos rechazó IdServicio.")+(detail?" · "+detail:"");
+      continue;
+    }
+    throw Error((pj.error||"99 Envíos rechazó el preenvío.")+(detail?" · "+detail:""));
+  }
+  if(!pj?.ok) throw Error(lastServiceError||"Ninguna cotización devolvió un IdServicio aceptado por 99 Envíos.");
   const raw=pj.data?.data||pj.data||{};
   const tracking=raw.numeroPreenvio||raw.numeroGuia||raw.numeroGuiaTransportadora||raw.guia||raw.numeroGuiaCliente||"";
   const external=tracking;
