@@ -122,6 +122,15 @@ export default async function handler(req,res){
   if(req.method==="GET"){
     const action=String(req.query?.action||"");
     try{
+      if(action==="prueba_domicilio"){
+        const token=await getToken();
+        const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Bogota",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());
+        const dp={}; for(const x of parts)if(x.type!=="literal")dp[x.type]=x.value;
+        const payload={destino:{nombre:"Medellin",codigo:"05001000"},origen:{nombre:"Bodega PolosJ2",codigo:"11001000"},IdTipoEntrega:1,IdServicio:1,valorDeclarado:149900,peso:1,alto:10,largo:10,ancho:10,fecha:String(dp.day).padStart(2,"0")+"-"+String(dp.month).padStart(2,"0")+"-"+dp.year,seguro99:false,seguro99plus:true,AplicaContrapago:true};
+        const rr=await fetch(API_BASE+"/cotizar",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(payload)});
+        const raw=await rr.text(); let data={}; try{data=raw?JSON.parse(raw):{}}catch(_){}
+        return res.status(rr.status).json({ok:rr.ok,upstream_status:rr.status,data,raw});
+      }
       if(action==="prueba_oficina"){
         const token=await getToken();
         const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Bogota",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());
