@@ -227,9 +227,12 @@ function numericField(obj,names){
  return null;
 }
 function resolveQuoteIds(chosen,root,office){
- // Usar el IdServicio que devuelve 99 Envíos en la cotización elegida.
- // No inferir IDs por transportadora: la API puede asignar servicios distintos.
- const servicio=numericField(chosen,["IdServicio","idServicio","id_servicio"]);
+ // Importante: el IdServicio de la cotización no es el IdServicio que acepta
+ // el endpoint /preenvio. Para Interrapidísimo, 99 Envíos valida IdServicio=1
+ // e IdTipoEntrega=1 en el preenvío. No copiar el ID interno de la cotización.
+ const carrier=String(chosen?.carrierKey||chosen?.carrierName||"").toLowerCase().replace(/[^a-z]/g,"");
+ const serviceByCarrier={interrapidisimo:1};
+ const servicio=serviceByCarrier[carrier]??null;
  return {IdTipoEntrega:1,IdServicio:servicio};
 }
 function quoteValue(q){
