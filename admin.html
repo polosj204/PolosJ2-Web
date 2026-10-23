@@ -7,7 +7,7 @@
 body{font-family:Arial;background:#090909;color:#fff;padding:20px}.box{max-width:1200px;margin:auto;background:#151515;padding:20px;border-radius:16px;margin-bottom:16px}
 input,button,select{padding:11px;border-radius:10px;border:1px solid #444;background:#111;color:#fff}button{background:#fff;color:#000;font-weight:bold;cursor:pointer}
 table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #333;text-align:left;vertical-align:top}.ok{color:#5fda91}.warn{color:#f2c86b}.bad{color:#ff8585}.muted{color:#999}.hide{display:none}
-.actions{display:flex;gap:7px;flex-wrap:wrap}.small{padding:8px 10px;font-size:12px}.shipping{font-size:12px}.modal-bg{position:fixed;inset:0;background:#000b;display:none;place-items:center;z-index:50;padding:16px}.modal-bg.open{display:grid}.modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#171717;border:1px solid #444;border-radius:18px;padding:20px}.field{margin:10px 0}.field label{display:block;font-size:12px;color:#bbb;margin-bottom:5px}.field input,.field select{width:100%;box-sizing:border-box}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.msg{margin-top:10px;font-size:13px;white-space:pre-wrap}@media(max-width:700px){.grid{grid-template-columns:1fr}table{font-size:12px}}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.small{padding:8px 10px;font-size:12px}.shipping{font-size:12px}.modal-bg{position:fixed;inset:0;background:#000b;display:none;place-items:center;z-index:50;padding:16px}.modal-bg.open{display:grid}.modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#171717;border:1px solid #444;border-radius:18px;padding:20px}.field{margin:10px 0}.field label{display:block;font-size:12px;color:#bbb;margin-bottom:5px}.field input,.field select{width:100%;box-sizing:border-box}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.stat{background:#202020;border:1px solid #333;border-radius:12px;padding:14px}.stat strong{display:block;font-size:24px;margin-top:5px}.stat span{color:#aaa;font-size:12px}.danger{background:#4b1717;color:#fff;border:1px solid #8c3434}@media(max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}.msg{margin-top:10px;font-size:13px;white-space:pre-wrap}@media(max-width:700px){.grid{grid-template-columns:1fr}table{font-size:12px}}
 </style>
 </head>
 <body>
@@ -15,6 +15,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px so
 
 <div id="app" class="hide">
   <div class="box"><button onclick="load()">Actualizar</button> <button onclick="location.reload()">Cerrar sesión</button></div>
+  <div class="box"><h2>Estadísticas de pedidos</h2><p class="muted">Resumen calculado con los pedidos registrados en PolosJ2.</p><div id="stats" class="stats"><div class="stat"><span>Pedidos totales</span><strong>—</strong></div></div></div>
   <div class="box"><h2>Pedidos</h2><div id="orders">Cargando...</div></div>
   <div class="box"><h2>Códigos de segunda compra</h2><div id="codes">Cargando...</div></div>
 </div>
@@ -70,17 +71,62 @@ async function load(){
  try{
   const o=await api("/rest/v1/orders?select=*&order=created_at.desc");
   const c=await api("/rest/v1/customers?select=id,name,phone,city"),cm={};c.forEach(x=>cm[x.id]=x);
+  renderStats(o);
   document.getElementById("orders").innerHTML=o.length?'<table><tr><th>Cliente</th><th>Total</th><th>Estado</th><th>Envío</th><th>Acciones</th></tr>'+
   o.map(x=>{
     const z=cm[x.customer_id]||{}, ship=x.tracking_number?'<span class="ok">Guía: <b>'+esc(x.tracking_number)+'</b></span>':(x.shipping_error?'<span class="bad">Error: '+esc(x.shipping_error)+'</span>':'<span class="muted">Sin guía</span>');
     const deliver=x.status==='delivered'?'<span class="ok">Entregado</span>':'<button class="small" onclick="deliver(\''+x.id+'\')">Marcar entregado</button>';
     const gen=x.tracking_number?'<span class="ok">Generado</span>':'<button class="small" onclick="openShipping(\''+x.id+'\')">Generar envío</button>';
-    return '<tr><td><b>'+esc(z.name)+'</b><br>'+esc(z.phone)+'<br>'+esc(z.city)+'</td><td>'+money(x.total)+'</td><td>'+deliver+'</td><td class="shipping">'+ship+'</td><td><div class="actions">'+gen+'</div></td></tr>'
+    return '<tr><td><b>'+esc(z.name)+'</b><br>'+esc(z.phone)+'<br>'+esc(z.city)+'<br><span class="muted">'+new Date(x.created_at).toLocaleDateString("es-CO")+'</span></td><td>'+money(x.total)+'</td><td>'+deliver+'</td><td class="shipping">'+ship+'<br><span class="muted">'+esc(x.shipping_status||"Sin estado de envío")+'</span></td><td><div class="actions">'+gen+'<button class="small danger" onclick="deleteOrder(\''+x.id+'\')">Eliminar</button></div></td></tr>'
   }).join("")+'</table>':'Sin pedidos';
 
   const d=await api("/rest/v1/discounts?select=code,discount_percent,active,used_at,expires_at,customer_id&order=created_at.desc");
   document.getElementById("codes").innerHTML=d.length?'<table><tr><th>Código</th><th>Descuento</th><th>Estado</th></tr>'+d.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+x.discount_percent+'%</td><td>'+(x.used_at?'Usado':'<span class="ok">Activo</span>')+'</td></tr>').join("")+'</table>':'Sin códigos';
  }catch(e){document.getElementById("orders").textContent=e.message}
+}
+
+function renderStats(orders){
+ const total=orders.length;
+ const delivered=orders.filter(x=>x.status==="delivered").length;
+ const pending=orders.filter(x=>x.status!=="delivered"&&x.status!=="cancelled"&&x.status!=="canceled").length;
+ const cancelled=orders.filter(x=>["cancelled","canceled"].includes(String(x.status||"").toLowerCase())).length;
+ const withGuide=orders.filter(x=>String(x.tracking_number||"").trim()).length;
+ const withoutGuide=total-withGuide;
+ const returned=orders.filter(x=>/devol|devuelt|retorn/i.test(String(x.shipping_status||""))).length;
+ const shippingIssue=orders.filter(x=>/error|novedad|fallid/i.test(String(x.shipping_status||""))||Boolean(x.shipping_error)).length;
+ const revenue=orders.reduce((sum,x)=>sum+Number(x.total||0),0);
+ const cards=[
+  ["Pedidos totales",total],
+  ["Pendientes",pending],
+  ["Entregados",delivered],
+  ["Cancelados",cancelled],
+  ["Con guía",withGuide],
+  ["Sin guía",withoutGuide],
+  ["Devoluciones",returned],
+  ["Novedades / errores",shippingIssue],
+  ["Valor total registrado",money(revenue)]
+ ];
+ document.getElementById("stats").innerHTML=cards.map(([label,value])=>'<div class="stat"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+}
+
+async function deleteOrder(id){
+ const row=await api("/rest/v1/orders?select=id,customer_id,total,status,tracking_number&id=eq."+encodeURIComponent(id));
+ if(!row.length){alert("No se encontró el pedido.");return}
+ const order=row[0];
+ const hasGuide=Boolean(order.tracking_number);
+ const warning="¿Eliminar definitivamente este pedido?\\n\\nValor: "+money(order.total)+"\\nEstado: "+(order.status||"sin estado")+(hasGuide?"\\nGuía registrada: "+order.tracking_number:"")+"\\n\\nEsta acción no se puede deshacer. Los artículos asociados se eliminarán y los códigos de descuento se conservarán, pero se desvincularán del pedido.";
+ if(!confirm(warning))return;
+ try{
+  // Conserva el código de descuento, pero elimina la referencia que impediría borrar el pedido.
+  await api("/rest/v1/discounts?used_order_id=eq."+encodeURIComponent(id),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({used_order_id:null})});
+  const response=await fetch(U+"/rest/v1/orders?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{apikey:K,Authorization:"Bearer "+T,Prefer:"return=minimal"}});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(result.message||result.details||result.hint||"No se pudo eliminar el pedido. Verifica permisos o relaciones de la base de datos.");
+  await load();
+  alert("Pedido eliminado correctamente.");
+ }catch(e){
+  alert("No se pudo eliminar el pedido: "+e.message);
+ }
 }
 
 async function deliver(id){
