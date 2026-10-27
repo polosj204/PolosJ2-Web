@@ -92,11 +92,11 @@ function openWhatsAppBusiness(phone,text){
  window.location.href=intent;
 }
 function sendDiscountCode(name,phone,code){
- phone=String(phone||"").replace(/\\D/g,"");
+ phone=String(phone||"").replace(/\D/g,"");
  if(phone.startsWith("0"))phone=phone.slice(1);
  if(!phone.startsWith("57"))phone="57"+phone;
  if(!phone||!code){alert("Este cliente no tiene teléfono o código disponible.");return;}
- const message="Hola "+decodeURIComponent(name||"Cliente")+" 👋\\n\\n¡Gracias por tu compra en PolosJ2! 🎉\\n\\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\\n\\n🎟️ *"+decodeURIComponent(code)+"*\\n\\nPodrás usarlo en tu próxima compra en nuestra página web.\\n\\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴";
+ const message="Hola "+decodeURIComponent(name||"Cliente")+" 👋\n\n¡Gracias por tu compra en PolosJ2! 🎉\n\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\n\n🎟️ *"+decodeURIComponent(code)+"*\n\nPodrás usarlo en tu próxima compra en nuestra página web.\n\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴";
  openWhatsAppBusiness(phone,encodeURIComponent(message));
 }
 
@@ -129,7 +129,7 @@ async function deleteOrder(id){
  if(!row.length){alert("No se encontró el pedido.");return}
  const order=row[0];
  const hasGuide=Boolean(order.tracking_number);
- const warning="¿Eliminar definitivamente este pedido?\\n\\nValor: "+money(order.total)+"\\nEstado: "+(order.status||"sin estado")+(hasGuide?"\\nGuía registrada: "+order.tracking_number:"")+"\\n\\nEsta acción no se puede deshacer. Los artículos asociados se eliminarán y los códigos de descuento se conservarán, pero se desvincularán del pedido.";
+ const warning="¿Eliminar definitivamente este pedido?\n\nValor: "+money(order.total)+"\nEstado: "+(order.status||"sin estado")+(hasGuide?"\nGuía registrada: "+order.tracking_number:"")+"\n\nEsta acción no se puede deshacer. Los artículos asociados se eliminarán y los códigos de descuento se conservarán, pero se desvincularán del pedido.";
  if(!confirm(warning))return;
  try{
   // Conserva el código de descuento, pero elimina la referencia que impediría borrar el pedido.
