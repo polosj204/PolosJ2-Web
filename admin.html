@@ -96,7 +96,7 @@ function sendDiscountCode(name,phone,code){
  if(phone.startsWith("0"))phone=phone.slice(1);
  if(!phone.startsWith("57"))phone="57"+phone;
  if(!phone||!code){alert("Este cliente no tiene teléfono o código disponible.");return;}
- const message="Hola "+decodeURIComponent(name||"Cliente")+" 👋\n\n¡Gracias por tu compra en PolosJ2! 🎉\n\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\n\n🎟️ *"+decodeURIComponent(code)+"*\n\nPodrás usarlo en tu próxima compra en nuestra página web.\n\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴";
+ const message="Hola "+decodeURIComponent(name||"Cliente")+" 👋\n\n¡Gracias por tu compra en PolosJ2! 🎉\n\nComo beneficio por ser cliente, tienes un código de *10% de descuento en tu segunda compra*:\n\n🎟️ *"+decodeURIComponent(code)+"*\n\nCompra nuevamente aquí: https://polosj2-web.vercel.app/\n\nIngresa tu código al hacer tu próxima compra.\n\n¡Te esperamos nuevamente en PolosJ2! 🇨🇴";
  openWhatsAppBusiness(phone,encodeURIComponent(message));
 }
 
