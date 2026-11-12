@@ -11,7 +11,10 @@ let cachedToken = null;
 let cachedAt = 0;
 
 function cors(res){
-  res.setHeader("Access-Control-Allow-Origin","https://polosj2-web.vercel.app");
+  const origin=String(req.headers?.origin||"");
+  const allowed=origin==="https://polosj2-web.vercel.app" || /^https:\/\/polosj2-web-[a-z0-9-]+-polosj204-4013\.vercel\.app$/i.test(origin);
+  if(allowed) res.setHeader("Access-Control-Allow-Origin",origin);
+  res.setHeader("Vary","Origin");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","Content-Type");
   return res;
