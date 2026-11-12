@@ -109,7 +109,7 @@ function renderStats(orders){
  const withoutGuide=total-withGuide;
  const returned=orders.filter(x=>/devol|devuelt|retorn/i.test(String(x.shipping_status||""))).length;
  const shippingIssue=orders.filter(x=>/error|novedad|fallid/i.test(String(x.shipping_status||""))||Boolean(x.shipping_error)).length;
- const revenue=orders.reduce((sum,x)=>sum+Number(x.total||0),0);
+ const revenue=orders.filter(x=>['delivered','paid'].includes(String(x.status||'').toLowerCase())).reduce((sum,x)=>sum+Number(x.total||0),0);
  const cards=[
   ["Pedidos totales",total],
   ["Pendientes",pending],
@@ -119,7 +119,7 @@ function renderStats(orders){
   ["Sin guía",withoutGuide],
   ["Devoluciones",returned],
   ["Novedades / errores",shippingIssue],
-  ["Valor total registrado",money(revenue)]
+  ["Ingresos entregados / pagados",money(revenue)]
  ];
  document.getElementById("stats").innerHTML=cards.map(([label,value])=>'<div class="stat"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
 }
