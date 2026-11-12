@@ -76,7 +76,7 @@ async function load(){
   o.map(x=>{
     const z=cm[x.customer_id]||{}, ship=x.tracking_number?'<span class="ok">Guía: <b>'+esc(x.tracking_number)+'</b></span>':(x.shipping_error?'<span class="bad">Error: '+esc(x.shipping_error)+'</span>':'<span class="muted">Sin guía</span>');
     const deliver=x.status==='delivered'?'<span class="ok">Entregado</span>':'<button class="small" onclick="deliver(\''+x.id+'\')">Marcar entregado</button>';
-    const gen=x.tracking_number?'<span class="ok">Generado</span>':'<button class="small" onclick="openShipping(\''+x.id+'\')">Generar envío</button>';
+    const gen=x.tracking_number?'<span class="ok">Guía registrada</span>':'<span class="muted" title="Las guías reales están desactivadas en pruebas">Guía desactivada en pruebas</span>';
     return '<tr><td><b>'+esc(z.name)+'</b><br>'+esc(z.phone)+'<br>'+esc(z.city)+'<br><span class="muted">'+new Date(x.created_at).toLocaleDateString("es-CO")+'</span></td><td>'+money(x.total)+'</td><td>'+deliver+'</td><td class="shipping">'+ship+'<br><span class="muted">'+esc(x.shipping_status||"Sin estado de envío")+'</span></td><td><div class="actions">'+gen+'<button class="small danger" onclick="deleteOrder(\''+x.id+'\')">Eliminar</button></div></td></tr>'
   }).join("")+'</table>':'Sin pedidos';
 
